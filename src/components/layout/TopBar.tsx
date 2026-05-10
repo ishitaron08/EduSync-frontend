@@ -11,13 +11,12 @@ const titles: Record<string, string> = {
   "/auth": "Access",
   "/dashboard/student": "Mission Control",
   "/dashboard/teacher": "Teaching Hub",
-  "/dashboard/admin": "Administration",
+  "/dashboard/admin": "Admin dashboard",
   "/timetable": "Timetable",
   "/goals": "Goals",
   "/profile": "Profile",
   "/recommendations": "Your Navigator",
-  "/rewards": "Rewards",
-  "/admin/setup": "System Setup"
+  "/rewards": "Rewards"
 };
 
 export function TopBar({

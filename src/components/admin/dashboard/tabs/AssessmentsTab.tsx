@@ -1,0 +1,81 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import api from "@/lib/api";
+import { describeApiError } from "@/lib/apiErrors";
+import { DataState } from "../DataState";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+
+type AssessmentRow = {
+  _id: string;
+  title: string;
+  type: "mcq" | "written";
+  status: "draft" | "published" | "closed";
+  startTime: string;
+  endTime: string;
+  attemptsCount?: number;
+  questions?: Array<unknown>;
+};
+
+export function AssessmentsTab() {
+  const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    async function loadAssessments() {
+      setStatus("loading");
+      setError(null);
+      try {
+        const { data } = await api.get<AssessmentRow[]>("/admin/assessments");
+        if (!alive) return;
+        setAssessments(Array.isArray(data) ? data : []);
+        setStatus("ready");
+      } catch (loadError) {
+        if (!alive) return;
+        setAssessments([]);
+        setError(describeApiError(loadError));
+        setStatus("error");
+      }
+    }
+
+    loadAssessments();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return (
+    <DataState status={status} error={error} loading="Loading assessments..." empty="No assessments were returned by the backend yet.">
+      <Card className="p-4 md:p-5">
+        <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Assessments</p>
+        <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border-subtle)]">
+          <table className="min-w-full text-left text-sm">
+            <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)]">
+              <tr>
+                <th className="px-4 py-3 font-medium">Title</th>
+                <th className="px-4 py-3 font-medium">Type</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Attempts</th>
+                <th className="px-4 py-3 font-medium">Schedule</th>
+              </tr>
+            </thead>
+            <tbody>
+              {assessments.map((assessment) => (
+                <tr key={assessment._id} className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+                  <td className="px-4 py-3 font-medium text-[var(--text-primary)]">{assessment.title}</td>
+                  <td className="px-4 py-3 text-[var(--text-muted)]">{assessment.type}</td>
+                  <td className="px-4 py-3"><Badge tone={assessment.status === "published" ? "green" : assessment.status === "closed" ? "blue" : "amber"}>{assessment.status}</Badge></td>
+                  <td className="px-4 py-3 text-[var(--text-muted)]">{Number(assessment.attemptsCount ?? 0).toLocaleString()}</td>
+                  <td className="px-4 py-3 text-[var(--text-muted)]">{new Date(assessment.startTime).toLocaleDateString()} - {new Date(assessment.endTime).toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </DataState>
+  );
+}

@@ -13,7 +13,6 @@ import {
   ListTodo,
   ScanLine,
   Trophy,
-  Settings2,
   Sparkles,
   Target
 } from "lucide-react";
@@ -34,7 +33,7 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
 
   const roleNav: NavItem[] = [];
   if (role) {
-    roleNav.push({ href: `/dashboard/${role}`, label: "Dashboard", icon: LayoutDashboard });
+    roleNav.push({ href: role === "admin" ? "/dashboard/admin" : `/dashboard/${role}`, label: role === "admin" ? "Admin dashboard" : "Dashboard", icon: LayoutDashboard });
   }
   if (role === "student") {
     roleNav.push(
@@ -53,9 +52,6 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
       { href: "/assessments", label: "Assessments", icon: ClipboardCheck, roles: ["teacher"] },
       { href: "/leaderboard", label: "Leaderboard", icon: Trophy, roles: ["teacher"] }
     );
-  }
-  if (role === "admin") {
-    roleNav.push({ href: "/admin/setup", label: "Admin setup", icon: Settings2, roles: ["admin"] });
   }
 
   const items = role ? [...baseNav, ...roleNav] : baseNav;
