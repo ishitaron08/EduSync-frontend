@@ -44,7 +44,7 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
       { href: "/dashboard/admin/analytics", label: "Learning Analytics", icon: Activity, roles: ["admin"] },
       { href: "/dashboard/admin/settings", label: "System Settings", icon: Settings, roles: ["admin"] }
     );
-  } else if (role) {
+  } else if (role === "student") {
     roleNav.push({ href: `/dashboard/${role}`, label: "Dashboard", icon: LayoutDashboard });
   }
   if (role === "student") {
@@ -61,8 +61,13 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
   }
   if (role === "teacher") {
     roleNav.push(
-      { href: "/assessments", label: "Assessments", icon: ClipboardCheck, roles: ["teacher"] },
-      { href: "/leaderboard", label: "Leaderboard", icon: Trophy, roles: ["teacher"] }
+      { href: "/dashboard/teacher", label: "Dashboard", icon: LayoutDashboard, roles: ["teacher"] },
+      { href: "/dashboard/teacher/timetable", label: "Timetable", icon: Calendar, roles: ["teacher"] },
+      { href: "/dashboard/teacher/attendance", label: "Attendance", icon: ScanLine, roles: ["teacher"] },
+      { href: "/dashboard/teacher/tests", label: "Create Tests", icon: ClipboardCheck, roles: ["teacher"] },
+      { href: "/dashboard/teacher/analytics", label: "Test Analytics", icon: Activity, roles: ["teacher"] },
+      { href: "/dashboard/teacher/students", label: "Student Progress", icon: GraduationCap, roles: ["teacher"] },
+      { href: "/dashboard/teacher/leaderboard", label: "Leaderboard", icon: Trophy, roles: ["teacher"] }
     );
   }
 
