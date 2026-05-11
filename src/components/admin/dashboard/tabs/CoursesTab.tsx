@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useAdminDashboardFilters } from "../hooks/useAdminDashboardFilters";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { Badge } from "@/components/ui/badge";
@@ -8,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { DataState } from "../DataState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AdminEmptyState, TabChrome } from "../TabChrome";
 
 type CourseRow = {
   _id: string;
@@ -26,7 +28,7 @@ type CourseListResponse = {
   limit?: number;
 };
 
-const STATUS_OPTIONS: Array<"all" | CourseRow["moderationStatus"]> = ["all", "pending", "approved", "rejected"];
+const STATUS_OPTIONS = ["All statuses", "pending", "approved", "rejected"] as const;
 
 function statusTone(status: CourseRow["moderationStatus"]) {
   if (status === "approved") return "green" as const;
@@ -38,8 +40,7 @@ export function CoursesTab() {
   const [courses, setCourses] = useState<CourseRow[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | CourseRow["moderationStatus"]>("all");
+  const { search, setSearch, statusFilter, setStatusFilter } = useAdminDashboardFilters();
   const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -72,7 +73,7 @@ export function CoursesTab() {
       courses.filter((course) => {
         const query = search.trim().toLowerCase();
         const matchesQuery = !query || [course.code, course.name, course.description ?? ""].some((value) => value.toLowerCase().includes(query));
-        const matchesStatus = statusFilter === "all" || course.moderationStatus === statusFilter;
+        const matchesStatus = statusFilter === "All statuses" || course.moderationStatus === statusFilter;
         return matchesQuery && matchesStatus;
       }),
     [courses, search, statusFilter]
@@ -94,8 +95,23 @@ export function CoursesTab() {
   }
 
   return (
-    <DataState status={status} error={error} loading="Loading courses..." empty="No courses were returned by the backend yet.">
-      <Card className="p-4 md:p-5">
+    <TabChrome
+      eyebrow="Courses"
+      title="Course moderation"
+      description="Real moderation data from the backend. Approve or reject inline."
+    >
+      <DataState
+        status={status}
+        error={error}
+        loading="Loading courses..."
+        empty={
+          <AdminEmptyState
+            title="No courses available"
+            description="The backend did not return any courses yet. Once course data exists, moderation actions will appear here."
+          />
+        }
+      >
+        <Card className="p-4 md:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Courses</p>
@@ -106,7 +122,7 @@ export function CoursesTab() {
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-primary)]">
               {STATUS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
-                  {option === "all" ? "All statuses" : option}
+                  {option === "All statuses" ? "All statuses" : option.charAt(0).toUpperCase() + option.slice(1)}
                 </option>
               ))}
             </select>
@@ -154,7 +170,8 @@ export function CoursesTab() {
             </tbody>
           </table>
         </div>
-      </Card>
-    </DataState>
+        </Card>
+      </DataState>
+    </TabChrome>
   );
 }

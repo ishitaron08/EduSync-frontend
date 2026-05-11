@@ -6,6 +6,7 @@ import { describeApiError } from "@/lib/apiErrors";
 import { DataState } from "../DataState";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { AdminEmptyState, TabChrome } from "../TabChrome";
 
 type AssessmentRow = {
   _id: string;
@@ -48,8 +49,23 @@ export function AssessmentsTab() {
   }, []);
 
   return (
-    <DataState status={status} error={error} loading="Loading assessments..." empty="No assessments were returned by the backend yet.">
-      <Card className="p-4 md:p-5">
+    <TabChrome
+      eyebrow="Assessments"
+      title="Assessment review"
+      description="Browse live assessment records and track attempt counts from the backend."
+    >
+      <DataState
+        status={status}
+        error={error}
+        loading="Loading assessments..."
+        empty={
+          <AdminEmptyState
+            title="No assessments available"
+            description="The backend has not returned assessment records yet. When data exists, assessment rows and attempt totals will show here."
+          />
+        }
+      >
+        <Card className="p-4 md:p-5">
         <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Assessments</p>
         <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border-subtle)]">
           <table className="min-w-full text-left text-sm">
@@ -75,7 +91,8 @@ export function AssessmentsTab() {
             </tbody>
           </table>
         </div>
-      </Card>
-    </DataState>
+        </Card>
+      </DataState>
+    </TabChrome>
   );
 }

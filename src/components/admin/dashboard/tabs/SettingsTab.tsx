@@ -3,13 +3,19 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useAuthStore } from "@/store/useAuthStore";
+import { TabChrome } from "../TabChrome";
 
 export function SettingsTab() {
   const user = useAuthStore((state) => state.user);
   const role = useAuthStore((state) => state.role);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-12">
+    <TabChrome
+      eyebrow="Settings"
+      title="Admin preferences"
+      description="Read-only profile and role visibility until persistence is wired end-to-end."
+    >
+      <div className="grid gap-6 xl:grid-cols-12">
       <div className="space-y-6 xl:col-span-8">
         <Card className="p-4 md:p-5">
           <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Settings</p>
@@ -48,6 +54,7 @@ export function SettingsTab() {
           </div>
         </Card>
       </div>
-    </div>
+      </div>
+    </TabChrome>
   );
 }

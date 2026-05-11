@@ -8,6 +8,7 @@ import { describeApiError } from "@/lib/apiErrors";
 import { DataState } from "../DataState";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { AdminEmptyState, TabChrome } from "../TabChrome";
 
 type OverviewMetrics = {
   users: { total: number; admin: number; teacher: number; student: number };
@@ -83,13 +84,23 @@ export function OverviewTab() {
   }, []);
 
   return (
-    <DataState
-      status={status}
-      error={error}
-      loading="Loading overview metrics..."
-      empty="No overview data is available yet."
+    <TabChrome
+      eyebrow="Overview"
+      title="Command center"
+      description="A live snapshot of users, courses, audits, and system health."
     >
-      <div className="space-y-6">
+      <DataState
+        status={status}
+        error={error}
+        loading="Loading overview metrics..."
+        empty={
+          <AdminEmptyState
+            title="No overview data available"
+            description="The backend did not return metrics yet. Once the admin APIs have data, summary cards and recent activity will appear here."
+          />
+        }
+      >
+        <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Card className="p-4">
             <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Total users</p>
@@ -181,7 +192,8 @@ export function OverviewTab() {
             </Card>
           </div>
         </div>
-      </div>
-    </DataState>
+        </div>
+      </DataState>
+    </TabChrome>
   );
 }

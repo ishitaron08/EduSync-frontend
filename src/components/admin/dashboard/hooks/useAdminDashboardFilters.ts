@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type AdminDashboardTab =
@@ -108,6 +108,7 @@ export function useAdminDashboardFilters() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
 
@@ -119,11 +120,14 @@ export function useAdminDashboardFilters() {
       return;
     }
 
-    router.replace(nextParams ? `${pathname}?${nextParams}` : pathname, { scroll: false });
+    startTransition(() => {
+      router.replace(nextParams ? `${pathname}?${nextParams}` : pathname, { scroll: false });
+    });
   }
 
   return {
     ...filters,
+    isPending,
     setActiveTab: (activeTab: AdminDashboardTab) => updateFilters({ ...filters, activeTab }),
     setSearch: (search: string) => updateFilters({ ...filters, search }),
     setRoleFilter: (roleFilter: string) => updateFilters({ ...filters, roleFilter }),

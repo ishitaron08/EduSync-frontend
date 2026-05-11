@@ -2,18 +2,28 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { BookOpenCheck, BookOpenText, LayoutDashboard, Monitor, Settings2, UsersRound } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type AdminDashboardTab, useAdminDashboardFilters } from "./hooks/useAdminDashboardFilters";
 
-const tabShell = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm text-[var(--text-muted)]";
+const tabShell = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm text-[var(--text-muted)] min-h-[200px]";
 
 function TabLoadingState({ label }: { label: string }) {
-  return <Card className={tabShell}>{label}</Card>;
+  return (
+    <Card className={tabShell}>
+      <div className="space-y-3">
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-4 w-40" />
+      </div>
+    </Card>
+  );
 }
 
+// Memoized tab components - only created once
 const OverviewTab = dynamic(() => import("./tabs/OverviewTab").then((module) => module.OverviewTab), {
   ssr: false,
   loading: () => <TabLoadingState label="Loading overview..." />
@@ -44,17 +54,31 @@ const SettingsTab = dynamic(() => import("./tabs/SettingsTab").then((module) => 
   loading: () => <TabLoadingState label="Loading settings..." />
 });
 
-const tabs: Array<{ value: AdminDashboardTab; label: string; icon: typeof LayoutDashboard }> = [
-  { value: "overview", label: "Overview", icon: LayoutDashboard },
-  { value: "users", label: "Users", icon: UsersRound },
-  { value: "courses", label: "Courses", icon: BookOpenText },
-  { value: "assessments", label: "Assessments", icon: BookOpenCheck },
-  { value: "operations", label: "Operations", icon: Monitor },
-  { value: "settings", label: "Settings", icon: Settings2 }
+const tabComponents: Record<AdminDashboardTab, React.ComponentType> = {
+  overview: OverviewTab,
+  users: UsersTab,
+  courses: CoursesTab,
+  assessments: AssessmentsTab,
+  operations: OperationsTab,
+  settings: SettingsTab,
+};
+
+const tabs: Array<{ value: AdminDashboardTab; label: string }> = [
+  { value: "overview", label: "Overview" },
+  { value: "users", label: "Users" },
+  { value: "courses", label: "Courses" },
+  { value: "assessments", label: "Assessments" },
+  { value: "operations", label: "Operations" },
+  { value: "settings", label: "Settings" }
 ];
 
 export function AdminDashboard() {
-  const { activeTab, setActiveTab } = useAdminDashboardFilters();
+  const { activeTab: urlTab, setActiveTab: setUrlTab } = useAdminDashboardFilters();
+
+  // Handle tab change - update URL in background via startTransition (in hook)
+  const handleTabChange = useCallback((value: string) => {
+    setUrlTab(value as AdminDashboardTab);
+  }, [setUrlTab]);
 
   return (
     <main className="mx-auto min-h-full max-w-[1600px] px-4 py-6 md:px-6 lg:px-8">
@@ -88,43 +112,29 @@ export function AdminDashboard() {
           </div>
         </Card>
 
-        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as AdminDashboardTab)} className="space-y-6">
-          <TabsList className="flex w-full flex-wrap justify-start gap-2 bg-transparent p-0">
-            {tabs.map(({ value, label, icon: Icon }) => (
-              <TabsTrigger
-                key={value}
-                value={value}
-                className="shrink-0 gap-2 rounded-full border border-[var(--border-subtle)] px-4 py-2 data-[state=active]:border-[var(--accent-primary)] data-[state=active]:bg-[var(--accent-primary)]/10 data-[state=active]:text-[var(--accent-primary)]"
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+        <Tabs value={urlTab} onValueChange={handleTabChange} className="space-y-6">
+          <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <TabsList className="h-auto w-max min-w-full justify-start gap-1 border-0 bg-transparent p-0">
+              {tabs.map(({ value, label }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="min-w-max px-4 py-2 text-sm data-[state=active]:shadow-sm"
+                >
+                  {label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </div>
 
-          <TabsContent value="overview" className="space-y-6">
-            <OverviewTab />
-          </TabsContent>
-
-          <TabsContent value="users" className="space-y-6">
-            <UsersTab />
-          </TabsContent>
-
-          <TabsContent value="courses" className="space-y-6">
-            <CoursesTab />
-          </TabsContent>
-
-          <TabsContent value="assessments" className="space-y-6">
-            <AssessmentsTab />
-          </TabsContent>
-
-          <TabsContent value="operations" className="space-y-6">
-            <OperationsTab />
-          </TabsContent>
-
-          <TabsContent value="settings" className="space-y-6">
-            <SettingsTab />
-          </TabsContent>
+          {tabs.map(({ value }) => {
+            const TabComponent = tabComponents[value];
+            return (
+              <TabsContent key={value} value={value} className="space-y-6 animate-in fade-in-50 duration-200">
+                {TabComponent ? <TabComponent /> : null}
+              </TabsContent>
+            );
+          })}
         </Tabs>
       </div>
     </main>

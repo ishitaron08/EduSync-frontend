@@ -6,31 +6,47 @@ import { cn } from "@/lib/utils";
 
 const Tabs = TabsPrimitive.Root;
 
+// TabsList variants
+const tabsListVariants = {
+  default: "inline-flex h-11 items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-1 text-[var(--text-muted)]",
+  pills: "flex w-full flex-wrap justify-start gap-2 bg-transparent p-0",
+  grid: "mb-5 grid h-auto w-full grid-cols-3 bg-[var(--bg-elevated)]",
+};
+
+interface TabsListProps extends React.ComponentPropsWithoutRef<typeof TabsPrimitive.List> {
+  variant?: "default" | "pills" | "grid";
+}
+
 const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
->(({ className, ...props }, ref) => (
+  TabsListProps
+>(({ className, variant = "default", ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
-    className={cn(
-      "inline-flex h-11 items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-1 text-[var(--text-muted)]",
-      className
-    )}
+    className={cn(tabsListVariants[variant], className)}
     {...props}
   />
 ));
 TabsList.displayName = TabsPrimitive.List.displayName;
 
+// TabsTrigger variants
+const tabsTriggerVariants = {
+  default: "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-medium ring-offset-[var(--bg-primary)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-[var(--accent-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm",
+  pills: "shrink-0 gap-2 rounded-full border border-[var(--border-subtle)] px-4 py-2 data-[state=active]:border-[var(--accent-primary)] data-[state=active]:bg-[var(--accent-primary)]/10 data-[state=active]:text-[var(--accent-primary)]",
+  grid: "",
+};
+
+interface TabsTriggerProps extends React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> {
+  variant?: "default" | "pills" | "grid";
+}
+
 const TabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>
->(({ className, ...props }, ref) => (
+  TabsTriggerProps
+>(({ className, variant = "default", ...props }, ref) => (
   <TabsPrimitive.Trigger
     ref={ref}
-    className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-medium ring-offset-[var(--bg-primary)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-[var(--accent-primary)] data-[state=active]:text-white data-[state=active]:shadow-[0_8px_20px_rgba(99,102,241,0.24)]",
-      className
-    )}
+    className={cn(tabsTriggerVariants[variant], className)}
     {...props}
   />
 ));
@@ -52,3 +68,4 @@ const TabsContent = React.forwardRef<
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 
 export { Tabs, TabsList, TabsTrigger, TabsContent };
+export type { TabsListProps, TabsTriggerProps };

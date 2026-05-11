@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { PencilLine, RefreshCcw, Search, Trash2, UserPlus } from "lucide-react";
+import { useAdminDashboardFilters } from "../hooks/useAdminDashboardFilters";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DataState } from "../DataState";
+import { AdminEmptyState, TabChrome } from "../TabChrome";
 
 type AdminUserRow = {
   _id: string;
@@ -43,7 +45,7 @@ const EMPTY_FORM: UserFormState = {
   rewardPoints: "0"
 };
 
-const ROLE_OPTIONS: Array<"all" | AdminUserRow["role"]> = ["all", "student", "teacher", "admin"];
+const ROLE_OPTIONS = ["All roles", "student", "teacher", "admin"] as const;
 
 function roleTone(role: AdminUserRow["role"]) {
   if (role === "admin") return "green" as const;
@@ -56,8 +58,7 @@ export function UsersTab() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [limit] = useState(25);
-  const [search, setSearch] = useState("");
-  const [roleFilter, setRoleFilter] = useState<"all" | AdminUserRow["role"]>("all");
+  const { search, setSearch, roleFilter, setRoleFilter } = useAdminDashboardFilters();
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -96,7 +97,7 @@ export function UsersTab() {
     const query = search.trim().toLowerCase();
     return users.filter((user) => {
       const matchesQuery = !query || [user.name, user.email, user.role].some((value) => value.toLowerCase().includes(query));
-      const matchesRole = roleFilter === "all" || user.role === roleFilter;
+      const matchesRole = roleFilter === "All roles" || user.role === roleFilter;
       return matchesQuery && matchesRole;
     });
   }, [roleFilter, search, users]);
@@ -178,38 +179,34 @@ export function UsersTab() {
 
   return (
     <div className="space-y-6">
-      <Card className="p-4 md:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Users</p>
-            <p className="mt-1 max-w-3xl text-sm text-[var(--text-muted)]">Create, update, and remove users backed by the live admin API.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              className="gap-2"
-              onClick={() =>
-                void api
-                  .get<UserListResponse>(`/admin/users?page=${page}&limit=${limit}`)
-                  .then(({ data }) => {
-                    setUsers(Array.isArray(data?.users) ? data.users : []);
-                    setTotal(Number(data?.total ?? 0));
-                    setStatus("ready");
-                  })
-                  .catch((refreshError) => {
-                    setError(describeApiError(refreshError));
-                    setStatus("error");
-                  })
-              }
-            >
-              <RefreshCcw className="h-4 w-4" /> Refresh
-            </Button>
-          </div>
-        </div>
-      </Card>
-
-      <div className="grid gap-6 xl:grid-cols-12">
+      <TabChrome
+        eyebrow="Users"
+        title="User management"
+        description="Create, update, and remove users backed by the live admin API."
+        actions={
+          <Button
+            type="button"
+            variant="ghost"
+            className="gap-2"
+            onClick={() =>
+              void api
+                .get<UserListResponse>(`/admin/users?page=${page}&limit=${limit}`)
+                .then(({ data }) => {
+                  setUsers(Array.isArray(data?.users) ? data.users : []);
+                  setTotal(Number(data?.total ?? 0));
+                  setStatus("ready");
+                })
+                .catch((refreshError) => {
+                  setError(describeApiError(refreshError));
+                  setStatus("error");
+                })
+            }
+          >
+            <RefreshCcw className="h-4 w-4" /> Refresh
+          </Button>
+        }
+      >
+        <div className="grid gap-6 xl:grid-cols-12">
         <Card className="p-4 md:p-5 xl:col-span-4">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -283,7 +280,7 @@ export function UsersTab() {
               <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)} className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-primary)]">
                 {ROLE_OPTIONS.map((option) => (
                   <option key={option} value={option}>
-                    {option === "all" ? "All roles" : option}
+                    {option === "All roles" ? "All roles" : option.charAt(0).toUpperCase() + option.slice(1)}
                   </option>
                 ))}
               </select>
@@ -291,7 +288,17 @@ export function UsersTab() {
           </div>
 
           <div className="mt-4">
-            <DataState status={tableState} error={error} loading="Loading users..." empty="No users matched the current search or role filter.">
+            <DataState
+              status={tableState}
+              error={error}
+              loading="Loading users..."
+              empty={
+                <AdminEmptyState
+                  title="No users found"
+                  description="No users matched the current search or role filter. Clear the filters or add a new account to continue."
+                />
+              }
+            >
               <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)]">
                 <table className="min-w-full text-left text-sm">
                   <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)]">
@@ -350,6 +357,7 @@ export function UsersTab() {
           </div>
         </Card>
       </div>
+      </TabChrome>
     </div>
   );
 }

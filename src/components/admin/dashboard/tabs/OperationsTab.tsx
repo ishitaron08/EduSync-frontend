@@ -8,6 +8,7 @@ import { DataState } from "../DataState";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { TimetableBuilderStub } from "@/components/admin/TimetableBuilderStub";
+import { AdminEmptyState, TabChrome } from "../TabChrome";
 
 type AuditLogRow = {
   _id: string;
@@ -47,17 +48,22 @@ export function OperationsTab() {
   }, []);
 
   return (
-    <div className="space-y-6">
-      <Card className="p-4 md:p-5">
-        <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Operations</p>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">Audit logs, timetable creation, and system health all live here.</p>
-      </Card>
+    <TabChrome
+      eyebrow="Operations"
+      title="Operational console"
+      description="Audit logs, timetable creation, and system health all live here."
+    >
+      <div className="space-y-6">
+        <TimetableBuilderStub />
+        <SystemHealth />
 
-      <TimetableBuilderStub />
-      <SystemHealth />
-
-      <DataState status={status} error={error} loading="Loading audit logs..." empty="No audit logs were returned yet.">
-        <Card className="p-4 md:p-5">
+        <DataState
+          status={status}
+          error={error}
+          loading="Loading audit logs..."
+          empty={<AdminEmptyState title="No audit logs available" description="The backend did not return audit logs yet. Operational history will appear here once activity exists." />}
+        >
+          <Card className="p-4 md:p-5">
           <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Audit log feed</p>
           <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border-subtle)]">
             <table className="min-w-full text-left text-sm">
@@ -81,8 +87,9 @@ export function OperationsTab() {
               </tbody>
             </table>
           </div>
-        </Card>
-      </DataState>
-    </div>
+          </Card>
+        </DataState>
+      </div>
+    </TabChrome>
   );
 }

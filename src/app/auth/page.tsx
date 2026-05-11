@@ -69,7 +69,7 @@ export default function AuthPage() {
         </div>
 
         <Tabs value={portalRole} onValueChange={(value) => setPortalRole(value as PortalRole)}>
-          <TabsList className="mb-5 grid h-auto w-full grid-cols-3 bg-[var(--bg-elevated)]">
+          <TabsList variant="grid">
             <TabsTrigger value="student">Student</TabsTrigger>
             <TabsTrigger value="teacher">Teacher</TabsTrigger>
             <TabsTrigger value="admin">Admin</TabsTrigger>
