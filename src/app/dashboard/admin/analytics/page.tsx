@@ -1,9 +1,9 @@
 "use client";
 
 import { useDashboardGuard } from "@/lib/authGuard";
-import { OverviewTab } from "@/components/admin/dashboard/tabs/OverviewTab";
+import { AnalyticsTab } from "@/components/admin/dashboard/tabs/AnalyticsTab";
 
-export default function AdminDashboardPage() {
+export default function AdminAnalyticsPage() {
   const allowed = useDashboardGuard("admin");
 
   if (!allowed) {
@@ -16,7 +16,7 @@ export default function AdminDashboardPage() {
 
   return (
     <main className="mx-auto min-h-full max-w-[1600px] px-4 py-6 md:px-6 lg:px-8">
-      <OverviewTab />
+      <AnalyticsTab />
     </main>
   );
 }

@@ -65,6 +65,8 @@ export function UsersTab() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(EMPTY_FORM);
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -177,6 +179,35 @@ export function UsersTab() {
     }
   }
 
+  async function handleBulkUpload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!bulkFile) return;
+    setBulkUploading(true);
+    setError(null);
+
+    try {
+      const text = await bulkFile.text();
+      const rows = text.split("\n").map((r) => r.trim()).filter(Boolean);
+      const usersToCreate = rows.slice(1).map((row) => {
+        const [name, email, role] = row.split(",");
+        return { name, email, role: role || "student", password: Math.random().toString(36).slice(-8) };
+      });
+
+      await api.post("/admin/users/bulk", { users: usersToCreate });
+      setBulkFile(null);
+      const { data } = await api.get<UserListResponse>(`/admin/users?page=${page}&limit=${limit}`);
+      setUsers(Array.isArray(data?.users) ? data.users : []);
+      setTotal(Number(data?.total ?? 0));
+      setStatus("ready");
+      alert(`Successfully uploaded ${usersToCreate.length} users.`);
+    } catch (err) {
+      setError(describeApiError(err));
+      setStatus("error");
+    } finally {
+      setBulkUploading(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <TabChrome
@@ -264,6 +295,21 @@ export function UsersTab() {
               ) : null}
             </div>
           </form>
+
+          <div className="mt-8 border-t border-[var(--border-subtle)] pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Bulk Upload</p>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">Upload a CSV file (Name, Email, Role) to create multiple accounts at once.</p>
+              </div>
+            </div>
+            <form className="mt-4 space-y-3" onSubmit={handleBulkUpload}>
+              <Input type="file" accept=".csv" onChange={(e) => setBulkFile(e.target.files?.[0] || null)} />
+              <Button type="submit" variant="filled" className="w-full gap-2" disabled={bulkUploading || !bulkFile}>
+                Upload CSV
+              </Button>
+            </form>
+          </div>
         </Card>
 
         <Card className="p-4 md:p-5 xl:col-span-8">

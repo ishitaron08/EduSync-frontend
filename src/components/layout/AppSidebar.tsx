@@ -14,7 +14,10 @@ import {
   ScanLine,
   Trophy,
   Sparkles,
-  Target
+  Target,
+  Users,
+  Settings,
+  Activity
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -32,8 +35,17 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const roleNav: NavItem[] = [];
-  if (role) {
-    roleNav.push({ href: role === "admin" ? "/dashboard/admin" : `/dashboard/${role}`, label: role === "admin" ? "Admin dashboard" : "Dashboard", icon: LayoutDashboard });
+  if (role === "admin") {
+    roleNav.push(
+      { href: "/dashboard/admin", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
+      { href: "/dashboard/admin/users", label: "User Management", icon: Users, roles: ["admin"] },
+      { href: "/dashboard/admin/timetable", label: "Timetable Management", icon: Calendar, roles: ["admin"] },
+      { href: "/dashboard/admin/attendance", label: "Attendance Records", icon: ScanLine, roles: ["admin"] },
+      { href: "/dashboard/admin/analytics", label: "Learning Analytics", icon: Activity, roles: ["admin"] },
+      { href: "/dashboard/admin/settings", label: "System Settings", icon: Settings, roles: ["admin"] }
+    );
+  } else if (role) {
+    roleNav.push({ href: `/dashboard/${role}`, label: "Dashboard", icon: LayoutDashboard });
   }
   if (role === "student") {
     roleNav.push(
