@@ -49,14 +49,12 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
   }
   if (role === "student") {
     roleNav.push(
-      { href: "/timetable", label: "Timetable", icon: Calendar, roles: ["student"] },
-      { href: "/attendance", label: "Attendance", icon: ScanLine, roles: ["student"] },
-      { href: "/goals", label: "Goals", icon: Target, roles: ["student"] },
-      { href: "/tasks", label: "Tasks", icon: ListTodo, roles: ["student"] },
-      { href: "/assessments", label: "Assessments", icon: ClipboardCheck, roles: ["student"] },
-      { href: "/leaderboard", label: "Leaderboard", icon: Trophy, roles: ["student"] },
-      { href: "/recommendations", label: "Navigator", icon: Sparkles, roles: ["student"] },
-      { href: "/rewards", label: "Rewards", icon: GraduationCap, roles: ["student"] }
+      { href: "/dashboard/student/timetable", label: "Timetable", icon: Calendar, roles: ["student"] },
+      { href: "/dashboard/student/attendance", label: "Attendance", icon: ScanLine, roles: ["student"] },
+      { href: "/dashboard/student/learning", label: "AI Learning", icon: Sparkles, roles: ["student"] },
+      { href: "/dashboard/student/assessments", label: "Assessments", icon: ClipboardCheck, roles: ["student"] },
+      { href: "/dashboard/student/leaderboard", label: "Leaderboard", icon: Trophy, roles: ["student"] },
+      { href: "/dashboard/student/profile", label: "Profile", icon: Settings, roles: ["student"] }
     );
   }
   if (role === "teacher") {
