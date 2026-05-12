@@ -9,7 +9,9 @@ export type AdminDashboardTab =
   | "courses"
   | "assessments"
   | "operations"
-  | "settings";
+  | "settings"
+  | "sections"
+  | "timetable";
 
 export type AdminDashboardFilters = {
   activeTab: AdminDashboardTab;
@@ -37,7 +39,9 @@ const ADMIN_TABS = new Set<AdminDashboardTab>([
   "courses",
   "assessments",
   "operations",
-  "settings"
+  "settings",
+  "sections",
+  "timetable"
 ]);
 
 const LEGACY_TAB_ALIASES: Record<string, AdminDashboardTab> = {

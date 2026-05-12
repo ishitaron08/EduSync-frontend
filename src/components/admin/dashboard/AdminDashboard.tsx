@@ -3,27 +3,18 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { BookOpenCheck, BookOpenText, LayoutDashboard, Monitor, Settings2, UsersRound, Calendar, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type AdminDashboardTab, useAdminDashboardFilters } from "./hooks/useAdminDashboardFilters";
 
-const tabShell = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm text-[var(--text-muted)] min-h-[200px]";
+const tabShell = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm text-[var(--text-muted)]";
 
 function TabLoadingState({ label }: { label: string }) {
-  return (
-    <Card className={tabShell}>
-      <div className="space-y-3">
-        <Skeleton className="h-4 w-32" />
-        <Skeleton className="h-4 w-48" />
-        <Skeleton className="h-4 w-40" />
-      </div>
-    </Card>
-  );
+  return <Card className={tabShell}>{label}</Card>;
 }
 
-// Memoized tab components - only created once
 const OverviewTab = dynamic(() => import("./tabs/OverviewTab").then((module) => module.OverviewTab), {
   ssr: false,
   loading: () => <TabLoadingState label="Loading overview..." />
@@ -54,30 +45,55 @@ const SettingsTab = dynamic(() => import("./tabs/SettingsTab").then((module) => 
   loading: () => <TabLoadingState label="Loading settings..." />
 });
 
-const tabComponents: Record<AdminDashboardTab, React.ComponentType> = {
-  overview: OverviewTab,
-  users: UsersTab,
-  courses: CoursesTab,
-  assessments: AssessmentsTab,
-  operations: OperationsTab,
-  settings: SettingsTab,
-};
+const SectionsTab = dynamic(() => import("./tabs/SectionsTab").then((module) => module.SectionsTab), {
+  ssr: false,
+  loading: () => <TabLoadingState label="Loading sections..." />
+});
 
-const tabs: Array<{ value: AdminDashboardTab; label: string }> = [
-  { value: "overview", label: "Overview" },
-  { value: "users", label: "Users" },
-  { value: "courses", label: "Courses" },
-  { value: "assessments", label: "Assessments" },
-  { value: "operations", label: "Operations" },
-  { value: "settings", label: "Settings" }
+const TimetableTab = dynamic(() => import("./tabs/TimetableTab").then((module) => module.TimetableTab), {
+  ssr: false,
+  loading: () => <TabLoadingState label="Loading timetable..." />
+});
+
+const tabs: Array<{ value: AdminDashboardTab; label: string; icon: typeof LayoutDashboard }> = [
+  { value: "overview", label: "Overview", icon: LayoutDashboard },
+  { value: "users", label: "Users", icon: UsersRound },
+  { value: "courses", label: "Courses", icon: BookOpenText },
+  { value: "sections", label: "Sections", icon: Layers },
+  { value: "timetable", label: "Timetable", icon: Calendar },
+  { value: "assessments", label: "Assessments", icon: BookOpenCheck },
+  { value: "operations", label: "Operations", icon: Monitor },
+  { value: "settings", label: "Settings", icon: Settings2 }
 ];
 
 export function AdminDashboard() {
   const { activeTab: urlTab, setActiveTab: setUrlTab } = useAdminDashboardFilters();
-
-  // Handle tab change - update URL in background via startTransition (in hook)
+  
+  // Optimistic UI state: local state updates immediately on click
+  // while URL update happens in the background
+  const [optimisticTab, setOptimisticTab] = useState<AdminDashboardTab>(urlTab);
+  const [isPending, setIsPending] = useState(false);
+  
+  // Sync optimistic state with URL state when URL changes externally
+  useEffect(() => {
+    setOptimisticTab(urlTab);
+  }, [urlTab]);
+  
+  // Handle tab change with optimistic UI
   const handleTabChange = useCallback((value: string) => {
-    setUrlTab(value as AdminDashboardTab);
+    const tabValue = value as AdminDashboardTab;
+    
+    // Immediately update UI (optimistic)
+    setOptimisticTab(tabValue);
+    setIsPending(true);
+    
+    // Update URL in background
+    setUrlTab(tabValue);
+    
+    // Clear pending state after a short delay
+    setTimeout(() => {
+      setIsPending(false);
+    }, 100);
   }, [setUrlTab]);
 
   return (
@@ -112,29 +128,47 @@ export function AdminDashboard() {
           </div>
         </Card>
 
-        <Tabs value={urlTab} onValueChange={handleTabChange} className="space-y-6">
-          <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <TabsList className="h-auto w-max min-w-full justify-start gap-1 border-0 bg-transparent p-0">
-              {tabs.map(({ value, label }) => (
-                <TabsTrigger
-                  key={value}
-                  value={value}
-                  className="min-w-max px-4 py-2 text-sm data-[state=active]:shadow-sm"
-                >
-                  {label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
-          </div>
+        <Tabs value={optimisticTab} onValueChange={handleTabChange} className="space-y-6">
+          <TabsList variant="pills" className={isPending ? "pointer-events-none opacity-70" : ""}>
+            {tabs.map(({ value, label, icon: Icon }) => (
+              <TabsTrigger key={value} value={value} variant="pills">
+                <Icon className="h-4 w-4" />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-          {tabs.map(({ value }) => {
-            const TabComponent = tabComponents[value];
-            return (
-              <TabsContent key={value} value={value} className="space-y-6 animate-in fade-in-50 duration-200">
-                {TabComponent ? <TabComponent /> : null}
-              </TabsContent>
-            );
-          })}
+          <TabsContent value="overview" className="space-y-6">
+            <OverviewTab />
+          </TabsContent>
+
+          <TabsContent value="users" className="space-y-6">
+            <UsersTab />
+          </TabsContent>
+
+          <TabsContent value="courses" className="space-y-6">
+            <CoursesTab />
+          </TabsContent>
+
+          <TabsContent value="sections" className="space-y-6">
+            <SectionsTab />
+          </TabsContent>
+
+          <TabsContent value="timetable" className="space-y-6">
+            <TimetableTab />
+          </TabsContent>
+
+          <TabsContent value="assessments" className="space-y-6">
+            <AssessmentsTab />
+          </TabsContent>
+
+          <TabsContent value="operations" className="space-y-6">
+            <OperationsTab />
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-6">
+            <SettingsTab />
+          </TabsContent>
         </Tabs>
       </div>
     </main>

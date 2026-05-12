@@ -79,10 +79,6 @@ export default function StudentAttendancePage() {
             <div className="w-full max-w-sm aspect-square bg-black rounded-xl overflow-hidden relative border-4 border-[var(--accent-primary)]/50">
               <Scanner 
                 onScan={handleScan}
-                components={{
-                  audio: false,
-                  tracker: true,
-                }}
               />
               <Button 
                 onClick={() => setScanning(false)} 

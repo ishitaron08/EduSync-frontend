@@ -26,34 +26,91 @@ type Timetable = {
   slots: Slot[];
 };
 
+type Teacher = {
+  _id?: string;
+  id?: string;
+  name: string;
+  email: string;
+};
+
+type Section = {
+  _id: string;
+  sectionCode: string;
+  course: { title: string };
+};
+
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
 export function TimetableTab() {
-  const [sectionId, setSectionId] = useState("65a12345678901234567890a"); // Dummy section ID for demo
-  const [className, setClassName] = useState("Computer Science - Year 1");
+  const [sections, setSections] = useState<Section[]>([]);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+
+  const [sectionId, setSectionId] = useState("");
+  const [className, setClassName] = useState("");
   const [timetable, setTimetable] = useState<Timetable | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("ready");
   const [error, setError] = useState<string | null>(null);
   
   // Form for adding a slot
   const [activeSlot, setActiveSlot] = useState<{day: string, time: string} | null>(null);
-  const [slotForm, setSlotForm] = useState({ subject: "", teacher: "65b12345678901234567890b", room: "" }); // Teacher needs objectId
+  const [slotForm, setSlotForm] = useState({ subject: "", teacher: "", room: "" });
 
   useEffect(() => {
+    let alive = true;
+    async function loadInitialData() {
+      try {
+        const [teachersRes, sectionsRes] = await Promise.all([
+          api.get("/admin/users?role=teacher&limit=100"),
+          api.get("/admin/sections")
+        ]);
+        if (alive) {
+          const fetchedTeachers = teachersRes.data.users || teachersRes.data.data || teachersRes.data;
+          setTeachers(Array.isArray(fetchedTeachers) ? fetchedTeachers : []);
+          
+          const fetchedSections = sectionsRes.data;
+          setSections(Array.isArray(fetchedSections) ? fetchedSections : []);
+          
+          if (fetchedSections && fetchedSections.length > 0) {
+             setSectionId(fetchedSections[0]._id);
+             setClassName(`${fetchedSections[0].course?.title || "Course"} - ${fetchedSections[0].sectionCode}`);
+          }
+        }
+      } catch(e) {
+        console.error("Failed to fetch initial data", e);
+      }
+    }
+    loadInitialData();
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!sectionId) return;
+    
     let alive = true;
     async function loadMasterTimetable() {
       setStatus("loading");
       try {
         const { data } = await api.get<Timetable>(`/admin/timetable/master?sectionId=${sectionId}`);
         if (alive) {
-          setTimetable(data);
+          // If no timetable returned (empty slots), initialize a fresh one
+          if (!data || !data.slots || data.slots.length === 0) {
+             setTimetable({ sectionId, year: new Date().getFullYear(), slots: [] });
+          } else {
+             setTimetable(data);
+          }
           setStatus("ready");
         }
-      } catch (err) {
+      } catch (err: any) {
         if (alive) {
-          setError(describeApiError(err));
-          setStatus("error");
+          // If 404 or not found, it means timetable doesn't exist yet, we can create a new one
+          if (err?.response?.status === 404) {
+             setTimetable({ sectionId, year: new Date().getFullYear(), slots: [] });
+             setStatus("ready");
+          } else {
+             setError(describeApiError(err));
+             setStatus("error");
+          }
         }
       }
     }
@@ -99,7 +156,7 @@ export function TimetableTab() {
       slots: [...timetable.slots.filter(s => !(s.day === activeSlot.day && s.startTime === activeSlot.time)), newSlot]
     });
     setActiveSlot(null);
-    setSlotForm({ subject: "", teacher: "65b12345678901234567890b", room: "" });
+    setSlotForm({ subject: "", teacher: "", room: "" });
   }
 
   function removeSlot(day: string, time: string) {
@@ -118,7 +175,7 @@ export function TimetableTab() {
     <TabChrome
       eyebrow="Timetable Management"
       title="Master Schedule Builder"
-      description="Create classes, assign subjects, and build schedules to prevent conflicts."
+      description="Select a section to build and manage its timetable."
       actions={
         <Button onClick={handleSaveTimetable} variant="filled" className="gap-2">
           <CalendarIcon className="h-4 w-4" /> Save Timetable
@@ -127,14 +184,30 @@ export function TimetableTab() {
     >
       <DataState status={status} error={error} loading="Loading schedule...">
         <div className="space-y-6">
-          <Card className="p-4 flex gap-4 items-center">
+          <Card className="p-4 flex flex-col md:flex-row gap-4 items-end">
             <div className="flex-1">
-              <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Class/Section Name</label>
-              <Input value={className} onChange={(e) => setClassName(e.target.value)} className="mt-1" />
+              <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Select Section</label>
+              <select 
+                className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                value={sectionId}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSectionId(val);
+                  const found = sections.find(s => s._id === val);
+                  if (found) setClassName(`${found.course?.title || "Course"} - ${found.sectionCode}`);
+                }}
+              >
+                {sections.length === 0 && <option value="" disabled>No sections available. Create one in the Sections tab.</option>}
+                {sections.map(s => (
+                  <option key={s._id} value={s._id}>
+                    {s.course?.title || "Unknown"} - {s.sectionCode}
+                  </option>
+                ))}
+              </select>
             </div>
             <div className="flex-1">
-              <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Section ID (System)</label>
-              <Input value={sectionId} readOnly className="mt-1 bg-[var(--bg-elevated)]" />
+              <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Section Details</label>
+              <Input value={className} readOnly className="mt-1 bg-[var(--bg-elevated)]" />
             </div>
           </Card>
 
@@ -143,18 +216,28 @@ export function TimetableTab() {
               <h4 className="font-medium text-[var(--text-primary)] mb-4">
                 Assign Slot: {activeSlot.day.toUpperCase()} at {activeSlot.time}
               </h4>
-              <form onSubmit={handleAddSlot} className="flex gap-4 items-end">
-                <div className="flex-1">
+              <form onSubmit={handleAddSlot} className="flex gap-4 items-end flex-wrap">
+                <div className="flex-1 min-w-[200px]">
                   <label className="text-xs uppercase text-[var(--text-muted)]">Subject</label>
                   <Input required value={slotForm.subject} onChange={(e) => setSlotForm({...slotForm, subject: e.target.value})} placeholder="e.g. Data Structures" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-[150px]">
                   <label className="text-xs uppercase text-[var(--text-muted)]">Room</label>
                   <Input required value={slotForm.room} onChange={(e) => setSlotForm({...slotForm, room: e.target.value})} placeholder="e.g. Room 101" />
                 </div>
-                <div className="flex-1">
-                  <label className="text-xs uppercase text-[var(--text-muted)]">Teacher ID (ObjectId)</label>
-                  <Input required value={slotForm.teacher} onChange={(e) => setSlotForm({...slotForm, teacher: e.target.value})} />
+                <div className="flex-1 min-w-[250px]">
+                  <label className="text-xs uppercase text-[var(--text-muted)]">Teacher</label>
+                  <select 
+                    required 
+                    value={slotForm.teacher} 
+                    onChange={(e) => setSlotForm({...slotForm, teacher: e.target.value})}
+                    className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)]"
+                  >
+                    <option value="" disabled>Select a teacher...</option>
+                    {teachers.map(t => (
+                      <option key={t.id || t._id} value={t.id || t._id}>{t.name} ({t.email})</option>
+                    ))}
+                  </select>
                 </div>
                 <Button type="submit" variant="filled">Add Slot</Button>
                 <Button type="button" variant="ghost" onClick={() => setActiveSlot(null)}>Cancel</Button>
@@ -162,7 +245,8 @@ export function TimetableTab() {
             </Card>
           )}
 
-          <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+          {timetable && timetable.slots && (
+          <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] mt-6">
             <table className="min-w-full text-left text-sm border-collapse">
               <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
                 <tr>
@@ -209,6 +293,7 @@ export function TimetableTab() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       </DataState>
     </TabChrome>

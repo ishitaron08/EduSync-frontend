@@ -1,7 +1,13 @@
 import { cn } from "@/lib/utils";
 import { ReactNode } from "react";
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
+type CardProps = {
+  className?: string;
+  children: ReactNode;
+  onClick?: () => void;
+};
+
+export function Card({ className, children, onClick }: CardProps) {
   return (
     <div
       className={cn(
@@ -9,6 +15,7 @@ export function Card({ className, children }: { className?: string; children: Re
         "border-t border-t-[var(--border-highlight)]/75 hover:shadow-[0_18px_38px_rgba(15,23,42,0.08)]",
         className
       )}
+      onClick={onClick}
     >
       {children}
     </div>

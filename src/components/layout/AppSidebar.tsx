@@ -17,7 +17,8 @@ import {
   Target,
   Users,
   Settings,
-  Activity
+  Activity,
+  Layers
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -39,6 +40,7 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
     roleNav.push(
       { href: "/dashboard/admin", label: "Dashboard", icon: LayoutDashboard, roles: ["admin"] },
       { href: "/dashboard/admin/users", label: "User Management", icon: Users, roles: ["admin"] },
+      { href: "/dashboard/admin/sections", label: "Section Management", icon: Layers, roles: ["admin"] },
       { href: "/dashboard/admin/timetable", label: "Timetable Management", icon: Calendar, roles: ["admin"] },
       { href: "/dashboard/admin/attendance", label: "Attendance Records", icon: ScanLine, roles: ["admin"] },
       { href: "/dashboard/admin/analytics", label: "Learning Analytics", icon: Activity, roles: ["admin"] },

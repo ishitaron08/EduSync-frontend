@@ -20,10 +20,17 @@ const buttonVariants = cva(
         default:
           "bg-[var(--accent-primary)] text-white shadow-[0_8px_20px_rgba(15,118,110,0.2)] hover:bg-[var(--accent-secondary)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]",
         destructive: "bg-[var(--accent-danger)] text-white shadow-sm hover:brightness-105 active:scale-[0.98]"
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-lg px-3 text-xs",
+        lg: "h-11 rounded-xl px-8",
+        icon: "h-10 w-10"
       }
     },
     defaultVariants: {
-      variant: "filled"
+      variant: "filled",
+      size: "default"
     }
   }
 );
