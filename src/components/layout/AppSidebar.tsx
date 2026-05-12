@@ -43,8 +43,7 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
       { href: "/dashboard/admin/sections", label: "Section Management", icon: Layers, roles: ["admin"] },
       { href: "/dashboard/admin/timetable", label: "Timetable Management", icon: Calendar, roles: ["admin"] },
       { href: "/dashboard/admin/attendance", label: "Attendance Records", icon: ScanLine, roles: ["admin"] },
-      { href: "/dashboard/admin/analytics", label: "Learning Analytics", icon: Activity, roles: ["admin"] },
-      { href: "/dashboard/admin/settings", label: "System Settings", icon: Settings, roles: ["admin"] }
+      { href: "/dashboard/admin/analytics", label: "Learning Analytics", icon: Activity, roles: ["admin"] }
     );
   } else if (role === "student") {
     roleNav.push({ href: `/dashboard/${role}`, label: "Dashboard", icon: LayoutDashboard });
@@ -122,6 +121,15 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
               >
                 Profile
               </Link>
+              {role === "admin" && (
+                <Link
+                  href="/dashboard/admin/settings"
+                  onClick={() => setMenuOpen(false)}
+                  className="block rounded px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+                >
+                  System Settings
+                </Link>
+              )}
               <button
                 type="button"
                 onClick={async () => {
