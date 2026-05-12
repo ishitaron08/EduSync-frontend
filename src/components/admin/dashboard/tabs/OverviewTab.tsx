@@ -179,17 +179,6 @@ export function OverviewTab() {
               </div>
             </Card>
 
-            <Card className="p-4 md:p-5">
-              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Quick actions</p>
-              <div className="mt-4 flex flex-col gap-2">
-                <Link href="/dashboard/admin?tab=users" className="inline-flex items-center justify-start rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
-                  Open users
-                </Link>
-                <Link href="/dashboard/admin?tab=operations" className="inline-flex items-center justify-start rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)]">
-                  Open operations
-                </Link>
-              </div>
-            </Card>
           </div>
         </div>
         </div>

@@ -76,7 +76,7 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
   return (
     <aside
       className={cn(
-        "flex shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 backdrop-blur-[12px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
+        "sticky top-0 flex shrink-0 flex-col h-screen border-r border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 backdrop-blur-[12px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden",
         expanded ? "w-[252px]" : "w-16"
       )}
     >
@@ -91,7 +91,7 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
           {expanded ? "EduSync" : "E"}
         </Link>
       </div>
-      <nav className="flex flex-1 flex-col gap-1.5 p-2.5">
+      <nav className="flex flex-col gap-1.5 p-2.5">
         {items.map((item) => {
           const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
           const Icon = item.icon;
@@ -112,7 +112,7 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
         })}
       </nav>
       {role ? (
-        <div className="relative border-t border-[var(--border-subtle)] p-2">
+        <div className="relative mt-auto border-t border-[var(--border-subtle)] p-2">
           {menuOpen ? (
             <div className="absolute bottom-14 left-2 right-2 z-20 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1 shadow-lg">
               <Link
