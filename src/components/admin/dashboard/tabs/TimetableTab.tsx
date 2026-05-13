@@ -58,6 +58,11 @@ type MasterTimetableInfo = {
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
+function teacherIdFrom(teacher: Slot["teacher"]) {
+  if (typeof teacher === "string") return teacher;
+  return teacher?._id ?? "";
+}
+
 export function TimetableTab() {
   const pathname = usePathname();
   const router = useRouter();
@@ -241,11 +246,15 @@ export function TimetableTab() {
     setSaveStatus("saving");
     setError(null);
     try {
+      const normalizedSlots = timetable.slots.map((slot) => ({
+        ...slot,
+        teacher: teacherIdFrom(slot.teacher)
+      }));
       await api.put("/admin/timetable/master", {
         sectionId,
         term: sectionTerm,
         year: sectionYear,
-        slots: timetable.slots
+        slots: normalizedSlots
       });
       setSaveStatus("saved");
       setHasExistingTimetable(true);
