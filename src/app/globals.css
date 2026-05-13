@@ -2,6 +2,8 @@
 
 /* EduSync light design tokens */
 :root {
+  --font-dm-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-jetbrains: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   --font-fraunces: var(--font-dm-sans);
   --bg-primary: #f6f8fb;
   --bg-surface: #ffffff;

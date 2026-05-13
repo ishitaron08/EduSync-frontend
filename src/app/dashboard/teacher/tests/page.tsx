@@ -1,22 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { describeApiError } from "@/lib/apiErrors";
 import api from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardCheck } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 
 type TeacherSection = {
   _id: string;
   sectionCode: string;
   course?: { code?: string; name?: string };
 };
+
+type Question = {
+  prompt: string;
+  options: string[];
+  correctOptionIndex: number | null;
+  marks: number;
+};
+
+type Assessment = {
+  _id: string;
+  title: string;
+  type: "mcq" | "written";
+  status: "draft" | "published" | "closed";
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  questions?: Question[];
+};
+
+const blankQuestion = (): Question => ({
+  prompt: "",
+  options: ["", ""],
+  correctOptionIndex: null,
+  marks: 1
+});
+
+function sectionLabel(section: TeacherSection) {
+  return `${section.course?.code ? `${section.course.code} - ` : ""}${section.course?.name || "Course"} (${section.sectionCode})`;
+}
+
+function questionIsValid(question: Question) {
+  return (
+    question.prompt.trim().length > 0 &&
+    question.options.length >= 2 &&
+    question.options.every(option => option.trim().length > 0) &&
+    typeof question.correctOptionIndex === "number" &&
+    question.correctOptionIndex >= 0 &&
+    question.correctOptionIndex < question.options.length &&
+    Number(question.marks) > 0
+  );
+}
 
 export default function TeacherTestsPage() {
   const allowed = useDashboardGuard("teacher");
@@ -26,14 +67,18 @@ export default function TeacherTestsPage() {
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [sections, setSections] = useState<TeacherSection[]>([]);
-  
-  // Common
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+
   const [title, setTitle] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [duration, setDuration] = useState("30");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [fileUrl, setFileUrl] = useState("");
+  const [rubric, setRubric] = useState("");
+  const [questions, setQuestions] = useState<Question[]>([blankQuestion()]);
   const [testTypeTab, setTestTypeTab] = useState<"mcq" | "written" | "history">("mcq");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!allowed) return;
@@ -58,42 +103,23 @@ export default function TeacherTestsPage() {
     }
   }, [searchParams]);
 
+  async function loadAssessments() {
+    const { data } = await api.get<Assessment[]>("/teacher/assessments");
+    setAssessments(Array.isArray(data) ? data : []);
+  }
+
+  useEffect(() => {
+    if (!allowed) return;
+    loadAssessments().catch((e) => setLoadErr(describeApiError(e)));
+  }, [allowed]);
+
+  const commonValid = title.trim() && sectionId && Number(duration) > 0 && startTime && endTime;
+  const mcqValid = Boolean(commonValid && questions.length > 0 && questions.every(questionIsValid));
+  const writtenValid = Boolean(commonValid && fileUrl.trim() && rubric.trim());
+
   if (!allowed) {
     return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
   }
-
-  const handleCreateTest = async (type: "mcq" | "written") => {
-    try {
-      setLoadErr(null);
-      setSuccess(null);
-      const payload: any = {
-        title,
-        section: sectionId,
-        type,
-        durationMinutes: parseInt(duration),
-        startTime: new Date(startTime).toISOString(),
-        endTime: new Date(endTime).toISOString(),
-        questions: []
-      };
-
-      if (type === "mcq") {
-        // In a real implementation, you'd add dynamic questions state here
-        payload.questions = [
-          { prompt: "Sample MCQ Question?", options: ["A", "B", "C", "D"], correctOptionIndex: 0, marks: 1 }
-        ];
-      } else {
-        payload.fileUrl = "https://example.com/question-paper.pdf";
-        payload.rubric = "Q1: 10 marks, Q2: 15 marks";
-      }
-
-      await api.post("/teacher/assessments", payload);
-      setSuccess(`${type.toUpperCase()} Test created successfully!`);
-      // Reset form
-      setTitle("");
-    } catch (e) {
-      setLoadErr(describeApiError(e));
-    }
-  };
 
   function updateTestsUrl(next: { section?: string; type?: "mcq" | "written" | "history" }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -113,119 +139,244 @@ export default function TeacherTestsPage() {
     updateTestsUrl({ section: sectionId, type: nextType });
   }
 
+  function resetForm() {
+    setTitle("");
+    setDuration("30");
+    setStartTime("");
+    setEndTime("");
+    setFileUrl("");
+    setRubric("");
+    setQuestions([blankQuestion()]);
+  }
+
+  async function handleCreateTest(type: "mcq" | "written") {
+    try {
+      setSaving(true);
+      setLoadErr(null);
+      setSuccess(null);
+      await api.post("/teacher/assessments", {
+        title,
+        section: sectionId,
+        type,
+        durationMinutes: Number(duration),
+        startTime: new Date(startTime).toISOString(),
+        endTime: new Date(endTime).toISOString(),
+        questions: type === "mcq"
+          ? questions.map(question => ({ ...question, correctOptionIndex: question.correctOptionIndex ?? 0 }))
+          : [],
+        fileUrl: type === "written" ? fileUrl : undefined,
+        rubric: type === "written" ? rubric : undefined
+      });
+      setSuccess("Test draft created.");
+      resetForm();
+      await loadAssessments();
+      setTestTypeTab("history");
+      updateTestsUrl({ section: sectionId, type: "history" });
+    } catch (e) {
+      setLoadErr(describeApiError(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function publishAssessment(id: string) {
+    try {
+      setLoadErr(null);
+      await api.patch(`/teacher/assessments/${id}/publish`);
+      setSuccess("Test published.");
+      await loadAssessments();
+    } catch (e) {
+      setLoadErr(describeApiError(e));
+    }
+  }
+
+  async function deleteAssessment(id: string) {
+    if (!confirm("Delete this draft test?")) return;
+    try {
+      setLoadErr(null);
+      await api.delete(`/teacher/assessments/${id}`);
+      setSuccess("Draft deleted.");
+      await loadAssessments();
+    } catch (e) {
+      setLoadErr(describeApiError(e));
+    }
+  }
+
+  function updateQuestion(index: number, patch: Partial<Question>) {
+    setQuestions(current => current.map((question, qIndex) => qIndex === index ? { ...question, ...patch } : question));
+  }
+
+  function updateOption(questionIndex: number, optionIndex: number, value: string) {
+    setQuestions(current => current.map((question, qIndex) => {
+      if (qIndex !== questionIndex) return question;
+      const options = question.options.map((option, idx) => idx === optionIndex ? value : option);
+      return { ...question, options };
+    }));
+  }
+
+  function removeOption(questionIndex: number, optionIndex: number) {
+    setQuestions(current => current.map((question, qIndex) => {
+      if (qIndex !== questionIndex || question.options.length <= 2) return question;
+      const options = question.options.filter((_, idx) => idx !== optionIndex);
+      const correctOptionIndex = question.correctOptionIndex === optionIndex ? null : question.correctOptionIndex;
+      return { ...question, options, correctOptionIndex };
+    }));
+  }
+
+  const sortedAssessments = useMemo(
+    () => [...assessments].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()),
+    [assessments]
+  );
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
       <div className="mb-6">
         <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">Manage Tests</h1>
-        <p className="text-sm text-[var(--text-muted)]">Create and publish MCQ or Written tests.</p>
+        <p className="text-sm text-[var(--text-muted)]">Create drafts, publish ready tests, and export results.</p>
       </div>
 
       {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)]">{loadErr}</p>}
       {success && <p className="mb-4 text-sm text-[var(--accent-primary)]">{success}</p>}
 
       <Tabs value={testTypeTab} onValueChange={handleTypeChange} className="space-y-6">
-        <TabsList className="bg-[var(--bg-elevated)] p-1 rounded-lg">
-          <TabsTrigger value="mcq" className="data-[state=active]:bg-[var(--bg-surface)]">MCQ Test</TabsTrigger>
-          <TabsTrigger value="written" className="data-[state=active]:bg-[var(--bg-surface)]">Written Test</TabsTrigger>
-          <TabsTrigger value="history" className="data-[state=active]:bg-[var(--bg-surface)]">History</TabsTrigger>
+        <TabsList>
+          <TabsTrigger value="mcq">MCQ Test</TabsTrigger>
+          <TabsTrigger value="written">Written Test</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="mcq">
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Create MCQ Test</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">Test Title</label>
-                <Input className="mt-1" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Midterm Quiz" />
+        {(["mcq", "written"] as const).map(type => (
+          <TabsContent key={type} value={type}>
+            <Card className="p-6">
+              <h2 className="mb-4 text-lg font-semibold">{type === "mcq" ? "Create MCQ Draft" : "Create Written Draft"}</h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-xs uppercase text-[var(--text-muted)]">Test Title</label>
+                  <Input className="mt-1" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Midterm Quiz" />
+                </div>
+                <div>
+                  <label className="text-xs uppercase text-[var(--text-muted)]">Section</label>
+                  <select className="mt-1 flex h-10 w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm" value={sectionId} onChange={e => handleSectionChange(e.target.value)}>
+                    <option value="" disabled>Select section...</option>
+                    {sections.map(section => <option key={section._id} value={section._id}>{sectionLabel(section)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs uppercase text-[var(--text-muted)]">Duration (Minutes)</label>
+                  <Input className="mt-1" type="number" min="1" value={duration} onChange={e => setDuration(e.target.value)} />
+                </div>
+                <div />
+                <div>
+                  <label className="text-xs uppercase text-[var(--text-muted)]">Start Time</label>
+                  <Input className="mt-1" type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                </div>
+                <div>
+                  <label className="text-xs uppercase text-[var(--text-muted)]">End Time</label>
+                  <Input className="mt-1" type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                </div>
               </div>
-              <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">Section</label>
-                <select className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm" value={sectionId} onChange={e => handleSectionChange(e.target.value)}>
-                  <option value="" disabled>Select section...</option>
-                  {sections.map(section => (
-                    <option key={section._id} value={section._id}>
-                      {section.course?.code ? `${section.course.code} - ` : ""}{section.course?.name || "Course"} ({section.sectionCode})
-                    </option>
+
+              {type === "mcq" ? (
+                <div className="mt-6 space-y-4">
+                  {questions.map((question, questionIndex) => (
+                    <Card key={questionIndex} className="p-4">
+                      <div className="mb-3 flex items-center justify-between">
+                        <h3 className="font-medium">Question {questionIndex + 1}</h3>
+                        <Button type="button" variant="ghost" size="sm" disabled={questions.length === 1} onClick={() => setQuestions(current => current.filter((_, idx) => idx !== questionIndex))}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Remove
+                        </Button>
+                      </div>
+                      <Input value={question.prompt} onChange={e => updateQuestion(questionIndex, { prompt: e.target.value })} placeholder="Question prompt" />
+                      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
+                        <div className="space-y-2">
+                          {question.options.map((option, optionIndex) => (
+                            <div key={optionIndex} className="flex items-center gap-2">
+                              <input type="radio" name={`correct-${questionIndex}`} checked={question.correctOptionIndex === optionIndex} onChange={() => updateQuestion(questionIndex, { correctOptionIndex: optionIndex })} />
+                              <Input value={option} onChange={e => updateOption(questionIndex, optionIndex, e.target.value)} placeholder={`Option ${optionIndex + 1}`} />
+                              <Button type="button" variant="ghost" size="icon" disabled={question.options.length <= 2} onClick={() => removeOption(questionIndex, optionIndex)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button type="button" variant="ghost" size="sm" onClick={() => updateQuestion(questionIndex, { options: [...question.options, ""] })}>
+                            <Plus className="mr-2 h-4 w-4" /> Add option
+                          </Button>
+                        </div>
+                        <div>
+                          <label className="text-xs uppercase text-[var(--text-muted)]">Marks</label>
+                          <Input className="mt-1 w-24" type="number" min="1" value={question.marks} onChange={e => updateQuestion(questionIndex, { marks: Number(e.target.value) })} />
+                        </div>
+                      </div>
+                      {!questionIsValid(question) && <p className="mt-2 text-xs text-[var(--accent-danger)]">Fill prompt, at least two options, correct option, and marks.</p>}
+                    </Card>
                   ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">Duration (Mins)</label>
-                <Input className="mt-1" type="number" value={duration} onChange={e => setDuration(e.target.value)} />
-              </div>
-              <div />
-              <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">Start Time</label>
-                <Input className="mt-1" type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">End Time</label>
-                <Input className="mt-1" type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
-              </div>
-            </div>
-            
-            {/* Mock question builder area */}
-            <div className="mt-6 p-4 border border-dashed border-[var(--border-subtle)] rounded-lg text-center text-[var(--text-muted)]">
-              <ClipboardCheck className="mx-auto mb-2 opacity-50" />
-              <p>Dynamic Question Builder goes here.</p>
-              <p className="text-xs">For this demo, clicking publish will attach 1 mock question.</p>
-            </div>
+                  <Button type="button" variant="ghost" onClick={() => setQuestions(current => [...current, blankQuestion()])}>
+                    <Plus className="mr-2 h-4 w-4" /> Add question
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-6 grid gap-4">
+                  <div>
+                    <label className="text-xs uppercase text-[var(--text-muted)]">Question Paper URL</label>
+                    <Input className="mt-1" value={fileUrl} onChange={e => setFileUrl(e.target.value)} placeholder="https://..." />
+                  </div>
+                  <div>
+                    <label className="text-xs uppercase text-[var(--text-muted)]">Grading Rubric</label>
+                    <textarea className="mt-1 min-h-[120px] w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm" value={rubric} onChange={e => setRubric(e.target.value)} />
+                  </div>
+                </div>
+              )}
 
-            <Button onClick={() => handleCreateTest("mcq")} className="mt-6 w-full md:w-auto" variant="filled">
-              Publish MCQ Test
-            </Button>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="written">
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold mb-4">Create Written Test</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">Test Title</label>
-                <Input className="mt-1" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Final Essay" />
-              </div>
-              <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">Section</label>
-                <select className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm" value={sectionId} onChange={e => handleSectionChange(e.target.value)}>
-                  <option value="" disabled>Select section...</option>
-                  {sections.map(section => (
-                    <option key={section._id} value={section._id}>
-                      {section.course?.code ? `${section.course.code} - ` : ""}{section.course?.name || "Course"} ({section.sectionCode})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">Start Time</label>
-                <Input className="mt-1" type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
-              </div>
-              <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">End Time</label>
-                <Input className="mt-1" type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
-              </div>
-            </div>
-
-            <div className="mt-6 p-4 border border-[var(--border-subtle)] rounded-lg">
-              <label className="text-xs uppercase text-[var(--text-muted)]">Upload Question Paper (PDF)</label>
-              <Input type="file" className="mt-2" accept=".pdf" />
-              <p className="text-xs text-[var(--text-muted)] mt-1">Mock upload. Will attach dummy URL.</p>
-            </div>
-
-            <div className="mt-4 p-4 border border-[var(--border-subtle)] rounded-lg">
-              <label className="text-xs uppercase text-[var(--text-muted)]">Grading Rubric</label>
-              <textarea className="w-full mt-2 p-2 rounded-md bg-[var(--bg-surface)] border border-[var(--border-subtle)] min-h-[100px]" placeholder="Q1: 10 marks for structure, 5 for content..."></textarea>
-            </div>
-
-            <Button onClick={() => handleCreateTest("written")} className="mt-6 w-full md:w-auto" variant="filled">
-              Publish Written Test
-            </Button>
-          </Card>
-        </TabsContent>
+              <Button onClick={() => handleCreateTest(type)} disabled={saving || (type === "mcq" ? !mcqValid : !writtenValid)} className="mt-6" variant="filled">
+                {saving ? "Creating..." : "Create Test (Draft)"}
+              </Button>
+            </Card>
+          </TabsContent>
+        ))}
 
         <TabsContent value="history">
-          <Card className="p-6 text-center text-[var(--text-muted)]">
-            <p>Fetching active and closed tests...</p>
+          <Card className="overflow-hidden">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-muted)]">
+                <tr>
+                  <th className="px-4 py-3">Title</th>
+                  <th className="px-4 py-3">Type</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Window</th>
+                  <th className="px-4 py-3">Questions</th>
+                  <th className="px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-subtle)]">
+                {sortedAssessments.map(assessment => (
+                  <tr key={assessment._id}>
+                    <td className="px-4 py-3 font-medium">{assessment.title}</td>
+                    <td className="px-4 py-3">{assessment.type.toUpperCase()}</td>
+                    <td className="px-4 py-3"><Badge tone={assessment.status === "published" ? "green" : assessment.status === "draft" ? "blue" : "muted"}>{assessment.status}</Badge></td>
+                    <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{new Date(assessment.startTime).toLocaleString()} - {new Date(assessment.endTime).toLocaleString()}</td>
+                    <td className="px-4 py-3">{assessment.questions?.length ?? 0}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        {assessment.status === "draft" ? (
+                          <>
+                            <Button size="sm" variant="filled" onClick={() => publishAssessment(assessment._id)}>Publish</Button>
+                            <Button size="sm" variant="ghost" onClick={() => deleteAssessment(assessment._id)}>Delete</Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button size="sm" variant="ghost" onClick={() => router.push(`/dashboard/teacher/analytics?test=${assessment._id}`)}>Analytics</Button>
+                            <Button size="sm" variant="ghost" onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api"}/teacher/assessments/${assessment._id}/export`, "_blank")}>Export CSV</Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {sortedAssessments.length === 0 && (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--text-muted)]">No tests created yet.</td></tr>
+                )}
+              </tbody>
+            </table>
           </Card>
         </TabsContent>
       </Tabs>

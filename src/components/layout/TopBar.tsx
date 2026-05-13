@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen, Search } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -11,6 +11,7 @@ const titles: Record<string, string> = {
   "/auth": "Access",
   "/dashboard/student": "Mission Control",
   "/dashboard/teacher": "Teaching Hub",
+  "/dashboard/teacher/timetable": "My Schedule",
   "/dashboard/admin": "Admin dashboard",
   "/timetable": "Timetable",
   "/goals": "Goals",
@@ -21,12 +22,10 @@ const titles: Record<string, string> = {
 
 export function TopBar({
   expanded,
-  onToggleSidebar,
-  onOpenCommand
+  onToggleSidebar
 }: {
   expanded: boolean;
   onToggleSidebar: () => void;
-  onOpenCommand: () => void;
 }) {
   const pathname = usePathname();
   const role = useAuthStore((s) => s.role);
@@ -53,19 +52,6 @@ export function TopBar({
         </h1>
       </div>
       <div className="flex items-center gap-3">
-        <Button
-          type="button"
-          variant="ghost"
-          className="hidden gap-2 sm:inline-flex"
-          onClick={onOpenCommand}
-          aria-label="Open command palette"
-        >
-          <Search className="h-4 w-4" />
-          <span className="font-mono text-xs text-[var(--text-muted)]">Search</span>
-          <kbd className="rounded border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-muted)]">
-            Ctrl K
-          </kbd>
-        </Button>
         {role ? (
           <>
             <Badge tone="amber">{role}</Badge>
@@ -79,27 +65,5 @@ export function TopBar({
         ) : null}
       </div>
     </header>
-  );
-}
-
-export function CommandPaletteStub({ open, onClose }: { open: boolean; onClose: () => void }) {
-  if (!open) return null;
-  return (
-    <div
-      role="dialog"
-      aria-modal
-        className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/30 pt-[15vh] backdrop-blur-sm"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 shadow-[0_20px_44px_rgba(15,23,42,0.14)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <p className="font-mono text-sm text-[var(--text-muted)]">Command palette (coming soon)</p>
-        <p className="mt-2 font-[family-name:var(--font-display)] text-sm text-[var(--text-primary)]">
-          Navigate and search across EduSync
-        </p>
-      </div>
-    </div>
   );
 }

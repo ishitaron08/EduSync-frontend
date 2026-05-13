@@ -16,6 +16,8 @@ type TestAnalytics = {
   max: number;
   min: number;
   avg: number;
+  avgPercent: number;
+  attemptsMaxScore: number;
   stdDev: number;
   questionAccuracy: { questionIndex: number; prompt: string; accuracy: number }[];
 };
@@ -114,7 +116,8 @@ export default function TeacherAnalyticsPage() {
             </Card>
             <Card className="p-4">
               <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Class Average</p>
-              <p className="text-2xl font-semibold mt-1">{analytics.avg.toFixed(1)}</p>
+              <p className="text-2xl font-semibold mt-1">{analytics.avgPercent.toFixed(1)}%</p>
+              <p className="text-xs text-[var(--text-muted)]">{analytics.avg.toFixed(1)} / {analytics.attemptsMaxScore.toFixed(1)} raw</p>
             </Card>
             <Card className="p-4">
               <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Highest / Lowest</p>

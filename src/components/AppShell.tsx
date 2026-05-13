@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { AppSidebar } from "@/components/layout/AppSidebar";
-import { CommandPaletteStub, TopBar } from "@/components/layout/TopBar";
+import { TopBar } from "@/components/layout/TopBar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -18,22 +18,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isHydrated = useAuthStore((s) => s.isHydrated);
   const bootstrapAuth = useAuthStore((s) => s.bootstrapAuth);
   const [expanded, setExpanded] = useState(true);
-  const [commandOpen, setCommandOpen] = useState(false);
 
   useEffect(() => {
     void bootstrapAuth();
   }, [bootstrapAuth]);
-
-  useEffect(() => {
-    const down = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        setCommandOpen((o) => !o);
-      }
-    };
-    window.addEventListener("keydown", down);
-    return () => window.removeEventListener("keydown", down);
-  }, []);
 
   const isAuthFullBleed = pathname === "/auth";
   const isAuthenticated = Boolean(token && role);
@@ -74,8 +62,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             EduSync
           </Link>
         </div>
-        <TopBar expanded={expanded} onToggleSidebar={() => setExpanded((e) => !e)} onOpenCommand={() => setCommandOpen(true)} />
-        <CommandPaletteStub open={commandOpen} onClose={() => setCommandOpen(false)} />
+        <TopBar expanded={expanded} onToggleSidebar={() => setExpanded((e) => !e)} />
         <div className="nc-page-enter flex flex-1 flex-col overflow-auto bg-[var(--bg-primary)]">{children}</div>
       </div>
     </div>

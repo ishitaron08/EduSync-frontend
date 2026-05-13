@@ -61,7 +61,7 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
   if (role === "teacher") {
     roleNav.push(
       { href: "/dashboard/teacher", label: "Dashboard", icon: LayoutDashboard, roles: ["teacher"] },
-      { href: "/dashboard/teacher/timetable", label: "Timetable", icon: Calendar, roles: ["teacher"] },
+      { href: "/dashboard/teacher/timetable", label: "My Schedule", icon: Calendar, roles: ["teacher"] },
       { href: "/dashboard/teacher/attendance", label: "Attendance", icon: ScanLine, roles: ["teacher"] },
       { href: "/dashboard/teacher/tests", label: "Create Tests", icon: ClipboardCheck, roles: ["teacher"] },
       { href: "/dashboard/teacher/analytics", label: "Test Analytics", icon: Activity, roles: ["teacher"] },
