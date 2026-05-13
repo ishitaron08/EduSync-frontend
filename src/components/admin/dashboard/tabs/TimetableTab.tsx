@@ -21,10 +21,16 @@ type Slot = {
   teacher: string | { _id: string; name: string; email: string };
 };
 
+// The backend GET /admin/timetable/master returns the raw Mongoose document
+// which uses `section` (ObjectId ref), never `sectionId`. The frontend holds
+// sectionId in its own state so we don't need to read it from the response,
+// but the type must reflect what actually arrives to avoid silent mismatches.
 type Timetable = {
   _id?: string;
-  sectionId?: string;
+  // `section` is what the backend sends — an ObjectId string on the wire.
+  // We keep `sectionId` as an optional alias for local state compatibility.
   section?: string;
+  sectionId?: string;
   term?: string;
   year: number;
   slots: Slot[];
@@ -46,10 +52,23 @@ type Section = {
   enrolledCount?: number;
 };
 
+// The backend GET /admin/timetable/master/list always returns `section` as a
+// fully populated object (sectionCode, course, term, year, _id) — never a
+// plain string. The previous type allowed string | {_id} which was misleading.
+type PopulatedSection = {
+  _id: string;
+  sectionCode: string;
+  term: string;
+  year: number;
+  course: { _id?: string; code?: string; name?: string };
+};
+
 type MasterTimetableInfo = {
   _id: string;
-  sectionId: string | { _id: string };
-  section?: string | { _id: string };
+  // sectionId is a convenience field the backend derives from section._id
+  sectionId: string;
+  // section is always a populated object from listMasterTimetables
+  section?: PopulatedSection;
   className: string;
   term?: string;
   year: number;
@@ -159,12 +178,10 @@ export function TimetableTab() {
     return () => { alive = false; };
   }, []);
 
-  // Check if section has an existing timetable
-  const getTimetableSectionId = (entry: MasterTimetableInfo) => {
-    if (typeof entry.sectionId === "object" && entry.sectionId?._id) return entry.sectionId._id;
-    if (typeof entry.section === "object" && entry.section?._id) return entry.section._id;
-    if (typeof entry.section === "string") return entry.section;
-    return String(entry.sectionId);
+  // sectionId is always a plain string in the updated MasterTimetableInfo type.
+  // The section object is also available as a fallback for older cached data.
+  const getTimetableSectionId = (entry: MasterTimetableInfo): string => {
+    return entry.sectionId || entry.section?._id || "";
   };
 
   const checkExistingTimetable = (sectId: string) => {
@@ -210,7 +227,9 @@ export function TimetableTab() {
             setTimetable({ sectionId, section: sectionId, term: sectionTerm, year: sectionYear, slots: [] });
             setHasExistingTimetable(false);
           } else {
-            setTimetable(data);
+            // Normalise: backend now sends both `section` (ObjectId) and
+            // `sectionId` (string). Ensure our local state always has sectionId.
+            setTimetable({ ...data, sectionId: data.sectionId ?? sectionId });
             setHasExistingTimetable(true);
           }
           setStatus("ready");

@@ -5,16 +5,27 @@ import { useEffect, useState } from "react";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ScanLine, Sparkles, ClipboardCheck, Flame, Calendar as CalendarIcon } from "lucide-react";
+import { ScanLine, Sparkles, ClipboardCheck, Flame, Calendar as CalendarIcon, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
 
 export default function StudentDashboardPage() {
   const allowed = useDashboardGuard("student");
   const [profile, setProfile] = useState<any>(null);
-  
+  const [attendanceStats, setAttendanceStats] = useState<{ percentage: number; present: number; total: number } | null>(null);
+
   useEffect(() => {
     if (!allowed) return;
     api.get("/student/profile").then(res => setProfile(res.data)).catch(console.error);
+    api.get("/student/attendance/stats")
+      .then(res => {
+        const { overall } = res.data;
+        setAttendanceStats({
+          percentage: overall.percentage,
+          present: overall.present,
+          total: overall.totalRecorded
+        });
+      })
+      .catch(() => {});
   }, [allowed]);
 
   if (!allowed) {
@@ -32,7 +43,7 @@ export default function StudentDashboardPage() {
           <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold text-[var(--text-primary)]">
             Welcome back, {profile?.name?.split(' ')[0] || "Student"}!
           </h1>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">Here's your daily overview and recommended actions.</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Here&apos;s your daily overview and recommended actions.</p>
         </div>
       </header>
 
@@ -56,6 +67,22 @@ export default function StudentDashboardPage() {
           <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Leaderboard Rank</p>
           <p className="font-semibold text-3xl text-[var(--text-primary)]">#{profile?.rank || "--"}</p>
           <Link href="/dashboard/student/leaderboard" className="text-xs text-[var(--accent-primary)] hover:underline">View Standings</Link>
+        </Card>
+
+        <Card className="p-5 flex flex-col items-center justify-center text-center gap-2 border-[var(--accent-secondary)]/30 bg-gradient-to-br from-[var(--bg-surface)] to-[var(--accent-secondary)]/5">
+          <div className="bg-[var(--accent-secondary)]/10 p-3 rounded-full">
+            <TrendingUp className="w-8 h-8 text-[var(--accent-secondary)]" />
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Attendance</p>
+            <p className={`font-semibold text-2xl ${
+              (attendanceStats?.percentage ?? 0) >= 75 ? "text-green-600" :
+              (attendanceStats?.percentage ?? 0) >= 50 ? "text-yellow-600" : "text-red-600"
+            }`}>
+              {attendanceStats ? `${attendanceStats.percentage}%` : "--"}
+            </p>
+          </div>
+          <Link href="/dashboard/student/attendance" className="text-xs text-[var(--accent-secondary)] hover:underline">View Details</Link>
         </Card>
       </div>
 
@@ -107,10 +134,10 @@ export default function StudentDashboardPage() {
       </div>
 
       <section className="space-y-4">
-        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Today's Schedule</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Today&apos;s Schedule</p>
         <Card className="p-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
-             <div className="bg-[var(--bg-elevated)] p-3 rounded-full">
+            <div className="bg-[var(--bg-elevated)] p-3 rounded-full">
               <CalendarIcon className="w-6 h-6 text-[var(--text-muted)]" />
             </div>
             <div>
@@ -119,7 +146,7 @@ export default function StudentDashboardPage() {
             </div>
           </div>
           <Button asChild variant="outline">
-             <Link href="/dashboard/student/timetable">Full Timetable</Link>
+            <Link href="/dashboard/student/timetable">Full Timetable</Link>
           </Button>
         </Card>
       </section>

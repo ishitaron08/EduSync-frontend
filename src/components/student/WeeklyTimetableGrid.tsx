@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Sparkles } from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { hueFromString } from "@/lib/hueFromString";
 
+// Slot type kept in sync with what the backend returns from /student/timetable.
+// isFreePeriod, durationMinutes, and teacher were previously missing, causing
+// free periods to render as regular class cards and teacher info to be lost.
 export type Slot = {
   day: string;
   startTime: string;
@@ -12,6 +17,9 @@ export type Slot = {
   subject: string;
   className: string;
   room: string;
+  isFreePeriod?: boolean;
+  durationMinutes?: number;
+  teacher?: { _id: string; name: string; email: string } | string;
 };
 
 const WEEK_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"] as const;
@@ -22,30 +30,33 @@ export function WeeklyTimetableGrid() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let c = false;
+    let cancelled = false;
     api
       .get<{ slots?: Slot[] }>("/student/timetable")
       .then((res) => {
-        if (!c) {
+        if (!cancelled) {
           setSlots(res.data.slots ?? []);
           setError(null);
         }
       })
       .catch((e) => {
-        if (!c) {
+        if (!cancelled) {
           setSlots([]);
           setError(describeApiError(e));
         }
       })
       .finally(() => {
-        if (!c) setLoading(false);
+        if (!cancelled) setLoading(false);
       });
     return () => {
-      c = true;
+      cancelled = true;
     };
   }, []);
 
-  const byDay = (day: string) => slots.filter((s) => s.day === day);
+  const byDay = (day: string) =>
+    slots
+      .filter((s) => s.day === day)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   if (loading) {
     return <div className="nc-skeleton min-h-[280px] w-full rounded-[8px]" />;
@@ -71,7 +82,38 @@ export function WeeklyTimetableGrid() {
               </div>
             ) : (
               byDay(day).map((s, i) => {
+                // Free periods get a distinct teal card with a "Get Tasks" CTA
+                if (s.isFreePeriod) {
+                  return (
+                    <div
+                      key={`free-${i}`}
+                      className="flex flex-col gap-1.5 rounded-[8px] border border-[var(--accent-primary)]/40 bg-[var(--accent-primary)]/8 px-2 py-2"
+                    >
+                      <div className="flex items-center gap-1 text-[var(--accent-primary)]">
+                        <Sparkles className="h-3 w-3" />
+                        <span className="text-[10px] font-bold uppercase tracking-wide">Free Period</span>
+                      </div>
+                      <p className="font-mono text-[11px] text-[var(--text-muted)]">
+                        {s.startTime}–{s.endTime}
+                        {s.durationMinutes ? ` (${s.durationMinutes}m)` : ""}
+                      </p>
+                      <Link
+                        href={`/dashboard/student/learning?duration=${s.durationMinutes ?? 60}`}
+                        className="mt-1 rounded-md border border-[var(--accent-primary)]/30 px-2 py-1 text-center text-[10px] font-medium text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white transition-colors"
+                      >
+                        Get Tasks
+                      </Link>
+                    </div>
+                  );
+                }
+
+                // Regular class card
                 const h = hueFromString(s.subject);
+                const teacherName =
+                  typeof s.teacher === "object" && s.teacher?.name
+                    ? s.teacher.name
+                    : null;
+
                 return (
                   <div
                     key={`${s.subject}-${i}`}
@@ -82,9 +124,15 @@ export function WeeklyTimetableGrid() {
                       {s.subject}
                     </p>
                     <p className="font-mono text-[11px] text-[var(--accent-secondary)]">
-                      {s.startTime}-{s.endTime}
+                      {s.startTime}–{s.endTime}
                     </p>
-                    <p className="text-xs text-[var(--text-muted)]">{s.className} | {s.room}</p>
+                    <p className="text-xs text-[var(--text-muted)]">
+                      {s.className}
+                      {s.room ? ` | ${s.room}` : ""}
+                    </p>
+                    {teacherName && (
+                      <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">{teacherName}</p>
+                    )}
                   </div>
                 );
               })
