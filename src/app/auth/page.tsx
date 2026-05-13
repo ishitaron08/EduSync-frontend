@@ -42,14 +42,10 @@ export default function AuthPage() {
     setLoading(true);
     setError(null);
     try {
-      await login(email, password);
+      await login(email, password, portalRole);
       const nextRole = useAuthStore.getState().role;
       if (!nextRole) {
         setError("Unable to identify account role.");
-        return;
-      }
-      if (nextRole !== portalRole) {
-        setError(`This account belongs to ${nextRole}. Switch to the ${nextRole} tab to continue.`);
         return;
       }
       router.replace(`/dashboard/${nextRole}`);

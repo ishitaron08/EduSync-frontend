@@ -18,7 +18,7 @@ interface AuthState {
   role: Role | null;
   user: AuthUser | null;
   isHydrated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, portalRole: Role) => Promise<void>;
   register: (name: string, email: string, password: string, role: Role) => Promise<void>;
   logout: () => Promise<void>;
   bootstrapAuth: () => Promise<void>;
@@ -52,10 +52,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.setItem("token", token);
     set({ token, role: decodeRole(token), user: null });
   },
-  login: async (email, password) => {
+  login: async (email, password, portalRole) => {
     const { data } = await api.post<{ token: string; user: AuthUser }>(
       "/auth/login",
-      { email, password },
+      { email, password, portalRole },
       { headers: { "x-skip-refresh-interceptor": "1" } }
     );
     set({ token: data.token, role: decodeRole(data.token), user: data.user ?? null });
