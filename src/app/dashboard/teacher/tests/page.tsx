@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 
 type TeacherSection = {
   _id: string;
@@ -48,15 +48,33 @@ function sectionLabel(section: TeacherSection) {
 }
 
 function questionIsValid(question: Question) {
+  const filledOptions = question.options
+    .map((option, index) => ({ option: option.trim(), index }))
+    .filter(entry => entry.option.length > 0);
+  const correctOption = typeof question.correctOptionIndex === "number"
+    ? question.options[question.correctOptionIndex]?.trim()
+    : "";
+
   return (
     question.prompt.trim().length > 0 &&
-    question.options.length >= 2 &&
-    question.options.every(option => option.trim().length > 0) &&
+    filledOptions.length >= 2 &&
     typeof question.correctOptionIndex === "number" &&
-    question.correctOptionIndex >= 0 &&
-    question.correctOptionIndex < question.options.length &&
+    correctOption.length > 0 &&
     Number(question.marks) > 0
   );
+}
+
+function normalizeQuestionForPayload(question: Question) {
+  const options = question.options
+    .map((option, index) => ({ value: option.trim(), originalIndex: index }))
+    .filter(option => option.value.length > 0);
+  const correctOptionIndex = options.findIndex(option => option.originalIndex === question.correctOptionIndex);
+  return {
+    prompt: question.prompt.trim(),
+    options: options.map(option => option.value),
+    correctOptionIndex,
+    marks: Number(question.marks)
+  };
 }
 
 export default function TeacherTestsPage() {
@@ -162,7 +180,7 @@ export default function TeacherTestsPage() {
         startTime: new Date(startTime).toISOString(),
         endTime: new Date(endTime).toISOString(),
         questions: type === "mcq"
-          ? questions.map(question => ({ ...question, correctOptionIndex: question.correctOptionIndex ?? 0 }))
+          ? questions.map(normalizeQuestionForPayload)
           : [],
         fileUrl: type === "written" ? fileUrl : undefined,
         rubric: type === "written" ? rubric : undefined
@@ -218,7 +236,12 @@ export default function TeacherTestsPage() {
     setQuestions(current => current.map((question, qIndex) => {
       if (qIndex !== questionIndex || question.options.length <= 2) return question;
       const options = question.options.filter((_, idx) => idx !== optionIndex);
-      const correctOptionIndex = question.correctOptionIndex === optionIndex ? null : question.correctOptionIndex;
+      const correctOptionIndex =
+        question.correctOptionIndex === optionIndex
+          ? null
+          : typeof question.correctOptionIndex === "number" && question.correctOptionIndex > optionIndex
+            ? question.correctOptionIndex - 1
+            : question.correctOptionIndex;
       return { ...question, options, correctOptionIndex };
     }));
   }
@@ -291,8 +314,18 @@ export default function TeacherTestsPage() {
                         <div className="space-y-2">
                           {question.options.map((option, optionIndex) => (
                             <div key={optionIndex} className="flex items-center gap-2">
-                              <input type="radio" name={`correct-${questionIndex}`} checked={question.correctOptionIndex === optionIndex} onChange={() => updateQuestion(questionIndex, { correctOptionIndex: optionIndex })} />
                               <Input value={option} onChange={e => updateOption(questionIndex, optionIndex, e.target.value)} placeholder={`Option ${optionIndex + 1}`} />
+                              <Button
+                                type="button"
+                                variant={question.correctOptionIndex === optionIndex ? "filled" : "ghost"}
+                                size="sm"
+                                className="shrink-0 gap-2"
+                                onClick={() => updateQuestion(questionIndex, { correctOptionIndex: optionIndex })}
+                                title="Mark this option as correct"
+                              >
+                                <Check className="h-4 w-4" />
+                                Correct
+                              </Button>
                               <Button type="button" variant="ghost" size="icon" disabled={question.options.length <= 2} onClick={() => removeOption(questionIndex, optionIndex)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
@@ -307,7 +340,7 @@ export default function TeacherTestsPage() {
                           <Input className="mt-1 w-24" type="number" min="1" value={question.marks} onChange={e => updateQuestion(questionIndex, { marks: Number(e.target.value) })} />
                         </div>
                       </div>
-                      {!questionIsValid(question) && <p className="mt-2 text-xs text-[var(--accent-danger)]">Fill prompt, at least two options, correct option, and marks.</p>}
+                      {!questionIsValid(question) && <p className="mt-2 text-xs text-[var(--accent-danger)]">Fill the prompt, at least two non-empty options, mark one filled option as correct, and set marks.</p>}
                     </Card>
                   ))}
                   <Button type="button" variant="ghost" onClick={() => setQuestions(current => [...current, blankQuestion()])}>
