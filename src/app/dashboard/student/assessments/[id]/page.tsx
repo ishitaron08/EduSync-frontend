@@ -42,7 +42,7 @@ export default function StudentTakeAssessmentPage() {
   const assessmentId = String(params.id);
   const [payload, setPayload] = useState<TakePayload | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
-  const [writtenAnswer, setWrittenAnswer] = useState("");
+  const [writtenAnswers, setWrittenAnswers] = useState<Record<number, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
@@ -75,8 +75,12 @@ export default function StudentTakeAssessmentPage() {
         selectedOptionIndex
       }));
     }
-    return [{ questionIndex: 0, textAnswer: writtenAnswer }];
-  }, [payload, selectedAnswers, writtenAnswer]);
+    const questions = payload.assessment.questions.length > 0 ? payload.assessment.questions : [{ prompt: "Answer", marks: 0 }];
+    return questions.map((_, questionIndex) => ({
+      questionIndex,
+      textAnswer: writtenAnswers[questionIndex] ?? ""
+    }));
+  }, [payload, selectedAnswers, writtenAnswers]);
 
   async function submit() {
     try {
@@ -153,19 +157,39 @@ export default function StudentTakeAssessmentPage() {
               ))}
             </div>
           ) : (
-            <Card className="p-5">
+            <div className="space-y-4">
               {payload.assessment.fileUrl && (
-                <a href={payload.assessment.fileUrl} target="_blank" rel="noreferrer" className="text-sm text-[var(--accent-primary)] hover:underline">
-                  Open question paper
-                </a>
+                <Card className="p-5">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h2 className="font-medium text-[var(--text-primary)]">Question Paper Attachment</h2>
+                    <a href={payload.assessment.fileUrl} target="_blank" rel="noreferrer" className="text-sm text-[var(--accent-primary)] hover:underline">
+                      {payload.assessment.fileUrl.startsWith("data:application/pdf") ? "Open PDF" : "Open full paper"}
+                    </a>
+                  </div>
+                  {payload.assessment.fileUrl.startsWith("data:image/") ? (
+                    <img src={payload.assessment.fileUrl} alt="Question paper" className="max-h-[520px] w-full rounded-lg border border-[var(--border-subtle)] object-contain" />
+                  ) : payload.assessment.fileUrl.startsWith("data:application/pdf") ? (
+                    <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-4 text-sm text-[var(--text-muted)]">A PDF question paper is attached. Open it in a new tab before answering.</p>
+                  ) : (
+                    <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-4 text-sm text-[var(--text-muted)]">Use the linked question paper above before answering.</p>
+                  )}
+                </Card>
               )}
-              <textarea
-                className="mt-4 min-h-[260px] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm"
-                value={writtenAnswer}
-                onChange={event => setWrittenAnswer(event.target.value)}
-                placeholder="Write your answer here..."
-              />
-            </Card>
+              {(payload.assessment.questions.length > 0 ? payload.assessment.questions : [{ prompt: "Write your answer for the attached question paper.", marks: 0 }]).map((question, questionIndex) => (
+                <Card key={questionIndex} className="p-5">
+                  <div className="mb-4 flex items-start justify-between gap-4">
+                    <h2 className="font-medium text-[var(--text-primary)]">Q{questionIndex + 1}. {question.prompt}</h2>
+                    {Number(question.marks ?? 0) > 0 && <span className="text-xs text-[var(--text-muted)]">{question.marks} marks</span>}
+                  </div>
+                  <textarea
+                    className="min-h-[180px] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm"
+                    value={writtenAnswers[questionIndex] ?? ""}
+                    onChange={event => setWrittenAnswers(current => ({ ...current, [questionIndex]: event.target.value }))}
+                    placeholder="Write your answer here..."
+                  />
+                </Card>
+              ))}
+            </div>
           )}
 
           <div className="flex justify-end">

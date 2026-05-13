@@ -25,6 +25,13 @@ type Question = {
   marks: number;
 };
 
+type WrittenQuestion = {
+  prompt: string;
+  marks: number;
+};
+
+type WrittenSourceMode = "typed" | "link" | "upload";
+
 type Assessment = {
   _id: string;
   title: string;
@@ -41,6 +48,11 @@ const blankQuestion = (): Question => ({
   options: ["", ""],
   correctOptionIndex: null,
   marks: 1
+});
+
+const blankWrittenQuestion = (): WrittenQuestion => ({
+  prompt: "",
+  marks: 10
 });
 
 function sectionLabel(section: TeacherSection) {
@@ -77,6 +89,18 @@ function normalizeQuestionForPayload(question: Question) {
   };
 }
 
+function writtenQuestionIsValid(question: WrittenQuestion) {
+  return question.prompt.trim().length > 0 && Number(question.marks) > 0;
+}
+
+function normalizeWrittenQuestionForPayload(question: WrittenQuestion) {
+  return {
+    prompt: question.prompt.trim(),
+    options: [],
+    marks: Number(question.marks)
+  };
+}
+
 export default function TeacherTestsPage() {
   const allowed = useDashboardGuard("teacher");
   const pathname = usePathname();
@@ -95,6 +119,8 @@ export default function TeacherTestsPage() {
   const [fileUrl, setFileUrl] = useState("");
   const [rubric, setRubric] = useState("");
   const [questions, setQuestions] = useState<Question[]>([blankQuestion()]);
+  const [writtenQuestions, setWrittenQuestions] = useState<WrittenQuestion[]>([blankWrittenQuestion()]);
+  const [writtenSourceMode, setWrittenSourceMode] = useState<WrittenSourceMode>("typed");
   const [testTypeTab, setTestTypeTab] = useState<"mcq" | "written" | "history">("mcq");
   const [saving, setSaving] = useState(false);
 
@@ -133,7 +159,12 @@ export default function TeacherTestsPage() {
 
   const commonValid = title.trim() && sectionId && Number(duration) > 0 && startTime && endTime;
   const mcqValid = Boolean(commonValid && questions.length > 0 && questions.every(questionIsValid));
-  const writtenValid = Boolean(commonValid && fileUrl.trim() && rubric.trim());
+  const hasValidWrittenQuestions = writtenQuestions.length > 0 && writtenQuestions.every(writtenQuestionIsValid);
+  const writtenSourceValid =
+    writtenSourceMode === "typed"
+      ? hasValidWrittenQuestions
+      : Boolean(fileUrl.trim());
+  const writtenValid = Boolean(commonValid && rubric.trim() && writtenSourceValid);
 
   if (!allowed) {
     return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
@@ -165,6 +196,17 @@ export default function TeacherTestsPage() {
     setFileUrl("");
     setRubric("");
     setQuestions([blankQuestion()]);
+    setWrittenQuestions([blankWrittenQuestion()]);
+    setWrittenSourceMode("typed");
+  }
+
+  function handleWrittenPaperUpload(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setFileUrl(String(reader.result ?? ""));
+    };
+    reader.readAsDataURL(file);
   }
 
   async function handleCreateTest(type: "mcq" | "written") {
@@ -172,6 +214,14 @@ export default function TeacherTestsPage() {
       setSaving(true);
       setLoadErr(null);
       setSuccess(null);
+      const writtenQuestionsPayload =
+        type === "written" && writtenSourceMode === "typed"
+          ? writtenQuestions.filter(writtenQuestionIsValid).map(normalizeWrittenQuestionForPayload)
+          : [];
+      const writtenFileUrl =
+        type === "written" && (writtenSourceMode === "link" || writtenSourceMode === "upload")
+          ? fileUrl
+          : undefined;
       await api.post("/teacher/assessments", {
         title,
         section: sectionId,
@@ -181,8 +231,8 @@ export default function TeacherTestsPage() {
         endTime: new Date(endTime).toISOString(),
         questions: type === "mcq"
           ? questions.map(normalizeQuestionForPayload)
-          : [],
-        fileUrl: type === "written" ? fileUrl : undefined,
+          : writtenQuestionsPayload,
+        fileUrl: writtenFileUrl,
         rubric: type === "written" ? rubric : undefined
       });
       setSuccess("Test draft created.");
@@ -222,6 +272,18 @@ export default function TeacherTestsPage() {
 
   function updateQuestion(index: number, patch: Partial<Question>) {
     setQuestions(current => current.map((question, qIndex) => qIndex === index ? { ...question, ...patch } : question));
+  }
+
+  function updateWrittenQuestion(index: number, patch: Partial<WrittenQuestion>) {
+    setWrittenQuestions(current => current.map((question, qIndex) => qIndex === index ? { ...question, ...patch } : question));
+  }
+
+  function selectWrittenSourceMode(mode: WrittenSourceMode) {
+    setWrittenSourceMode(mode);
+    setFileUrl("");
+    if (mode !== "typed") {
+      setWrittenQuestions([blankWrittenQuestion()]);
+    }
   }
 
   function updateOption(questionIndex: number, optionIndex: number, value: string) {
@@ -270,9 +332,17 @@ export default function TeacherTestsPage() {
 
         {(["mcq", "written"] as const).map(type => (
           <TabsContent key={type} value={type}>
-            <Card className="p-6">
-              <h2 className="mb-4 text-lg font-semibold">{type === "mcq" ? "Create MCQ Draft" : "Create Written Draft"}</h2>
-              <div className="grid gap-4 md:grid-cols-2">
+            <Card className="p-0">
+              <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 px-6 py-5">
+                <h2 className="text-lg font-semibold text-[var(--text-primary)]">{type === "mcq" ? "Create MCQ Draft" : "Create Written Draft"}</h2>
+                <p className="mt-1 text-sm text-[var(--text-muted)]">
+                  {type === "mcq"
+                    ? "Build objective questions with a marked correct option for auto-grading."
+                    : "Choose how students will receive the written paper, then add the grading rubric."}
+                </p>
+              </div>
+
+              <div className="grid gap-4 p-6 md:grid-cols-2">
                 <div>
                   <label className="text-xs uppercase text-[var(--text-muted)]">Test Title</label>
                   <Input className="mt-1" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Midterm Quiz" />
@@ -300,7 +370,7 @@ export default function TeacherTestsPage() {
               </div>
 
               {type === "mcq" ? (
-                <div className="mt-6 space-y-4">
+                <div className="space-y-4 px-6 pb-6">
                   {questions.map((question, questionIndex) => (
                     <Card key={questionIndex} className="p-4">
                       <div className="mb-3 flex items-center justify-between">
@@ -348,21 +418,119 @@ export default function TeacherTestsPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="mt-6 grid gap-4">
+                <div className="grid gap-5 px-6 pb-6">
                   <div>
-                    <label className="text-xs uppercase text-[var(--text-muted)]">Question Paper URL</label>
-                    <Input className="mt-1" value={fileUrl} onChange={e => setFileUrl(e.target.value)} placeholder="https://..." />
+                    <p className="mb-3 text-xs uppercase text-[var(--text-muted)]">Question Source</p>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      {([
+                        { value: "typed", title: "Type questions", description: "Create each written question here." },
+                        { value: "link", title: "Link", description: "Paste a paper URL for students." },
+                        { value: "upload", title: "Image / PDF", description: "Attach a scanned or digital paper." }
+                      ] as Array<{ value: WrittenSourceMode; title: string; description: string }>).map(option => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => selectWrittenSourceMode(option.value)}
+                          className={`rounded-lg border p-4 text-left transition-colors ${
+                            writtenSourceMode === option.value
+                              ? "border-[var(--accent-primary)] bg-[var(--accent-primary)]/10"
+                              : "border-[var(--border-subtle)] bg-[var(--bg-surface)] hover:bg-[var(--bg-elevated)]"
+                          }`}
+                        >
+                          <span className="block font-medium text-[var(--text-primary)]">{option.title}</span>
+                          <span className="mt-1 block text-xs text-[var(--text-muted)]">{option.description}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
+
+                  {writtenSourceMode === "typed" && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-medium text-[var(--text-primary)]">Typed Questions</h3>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setWrittenQuestions(current => [...current, blankWrittenQuestion()])}>
+                          <Plus className="mr-2 h-4 w-4" /> Add question
+                        </Button>
+                      </div>
+                      {writtenQuestions.map((question, questionIndex) => (
+                        <Card key={questionIndex} className="p-4">
+                          <div className="mb-3 flex items-center justify-between gap-3">
+                            <h4 className="font-medium">Question {questionIndex + 1}</h4>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={writtenQuestions.length === 1}
+                              onClick={() => setWrittenQuestions(current => current.filter((_, idx) => idx !== questionIndex))}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Remove
+                            </Button>
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+                            <textarea
+                              className="min-h-[90px] w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm"
+                              value={question.prompt}
+                              onChange={e => updateWrittenQuestion(questionIndex, { prompt: e.target.value })}
+                              placeholder="Write the question students should answer..."
+                            />
+                            <div>
+                              <label className="text-xs uppercase text-[var(--text-muted)]">Marks</label>
+                              <Input
+                                className="mt-1 w-24"
+                                type="number"
+                                min="1"
+                                value={question.marks}
+                                onChange={e => updateWrittenQuestion(questionIndex, { marks: Number(e.target.value) })}
+                              />
+                            </div>
+                          </div>
+                          {!writtenQuestionIsValid(question) && (
+                            <p className="mt-2 text-xs text-[var(--accent-danger)]">Question text and marks are required.</p>
+                          )}
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {writtenSourceMode === "link" && (
+                    <div>
+                      <label className="text-xs uppercase text-[var(--text-muted)]">Question Paper Link</label>
+                      <Input className="mt-1" value={fileUrl} onChange={e => setFileUrl(e.target.value)} placeholder="https://..." />
+                    </div>
+                  )}
+
+                  {writtenSourceMode === "upload" && (
+                    <div>
+                      <label className="text-xs uppercase text-[var(--text-muted)]">Image / PDF Upload</label>
+                      <Input className="mt-1" type="file" accept="image/*,.pdf" onChange={e => handleWrittenPaperUpload(e.target.files?.[0] ?? null)} />
+                    {fileUrl.startsWith("data:image/") && (
+                      <img src={fileUrl} alt="Uploaded question paper preview" className="mt-3 max-h-64 rounded-lg border border-[var(--border-subtle)] object-contain" />
+                    )}
+                    {fileUrl.startsWith("data:application/pdf") && (
+                      <p className="mt-2 text-xs text-[var(--text-muted)]">PDF question paper attached.</p>
+                    )}
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-xs uppercase text-[var(--text-muted)]">Grading Rubric</label>
                     <textarea className="mt-1 min-h-[120px] w-full rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm" value={rubric} onChange={e => setRubric(e.target.value)} />
                   </div>
+                  {!writtenValid && (
+                    <p className="text-xs text-[var(--accent-danger)]">
+                      {writtenSourceMode === "typed"
+                        ? "Add at least one typed question and fill the rubric."
+                        : "Attach or link the question paper and fill the rubric."}
+                    </p>
+                  )}
                 </div>
               )}
 
-              <Button onClick={() => handleCreateTest(type)} disabled={saving || (type === "mcq" ? !mcqValid : !writtenValid)} className="mt-6" variant="filled">
-                {saving ? "Creating..." : "Create Test (Draft)"}
-              </Button>
+              <div className="border-t border-[var(--border-subtle)] px-6 py-5">
+                <Button onClick={() => handleCreateTest(type)} disabled={saving || (type === "mcq" ? !mcqValid : !writtenValid)} variant="filled">
+                  {saving ? "Creating..." : "Create Test (Draft)"}
+                </Button>
+              </div>
             </Card>
           </TabsContent>
         ))}
