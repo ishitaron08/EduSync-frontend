@@ -116,7 +116,7 @@ export function useAdminDashboardFilters() {
 
   const filters = useMemo(() => parseFilters(searchParams), [searchParams]);
 
-  function updateFilters(nextFilters: AdminDashboardFilters) {
+  function updateFilters(nextFilters: AdminDashboardFilters, options: { history?: "push" | "replace" } = {}) {
     const nextParams = serializeFilters(nextFilters).toString();
     const currentParams = searchParams.toString();
 
@@ -125,14 +125,19 @@ export function useAdminDashboardFilters() {
     }
 
     startTransition(() => {
-      router.replace(nextParams ? `${pathname}?${nextParams}` : pathname, { scroll: false });
+      const href = nextParams ? `${pathname}?${nextParams}` : pathname;
+      if (options.history === "push") {
+        router.push(href, { scroll: false });
+      } else {
+        router.replace(href, { scroll: false });
+      }
     });
   }
 
   return {
     ...filters,
     isPending,
-    setActiveTab: (activeTab: AdminDashboardTab) => updateFilters({ ...filters, activeTab }),
+    setActiveTab: (activeTab: AdminDashboardTab) => updateFilters({ ...filters, activeTab }, { history: "push" }),
     setSearch: (search: string) => updateFilters({ ...filters, search }),
     setRoleFilter: (roleFilter: string) => updateFilters({ ...filters, roleFilter }),
     setStatusFilter: (statusFilter: string) => updateFilters({ ...filters, statusFilter }),

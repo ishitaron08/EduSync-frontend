@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { useDashboardGuard } from "@/lib/authGuard";
@@ -21,6 +22,9 @@ type TestAnalytics = {
 
 export default function TeacherAnalyticsPage() {
   const allowed = useDashboardGuard("teacher");
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [tests, setTests] = useState<TestRecord[]>([]);
   const [selectedTest, setSelectedTest] = useState<string>("");
   const [analytics, setAnalytics] = useState<TestAnalytics | null>(null);
@@ -31,10 +35,15 @@ export default function TeacherAnalyticsPage() {
     api.get<TestRecord[]>("/teacher/assessments")
       .then((res) => {
         setTests(Array.isArray(res.data) ? res.data : []);
-        if (res.data.length > 0) setSelectedTest(res.data[0]._id);
+        const urlTest = searchParams.get("test");
+        if (urlTest && res.data.some(test => test._id === urlTest)) {
+          setSelectedTest(urlTest);
+        } else if (res.data.length > 0) {
+          setSelectedTest(res.data[0]._id);
+        }
       })
       .catch((e) => setLoadErr(describeApiError(e)));
-  }, [allowed]);
+  }, [allowed, searchParams]);
 
   useEffect(() => {
     if (!selectedTest) return;
@@ -61,6 +70,13 @@ export default function TeacherAnalyticsPage() {
     }
   };
 
+  function handleSelectTest(testId: string) {
+    setSelectedTest(testId);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("test", testId);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
       <div className="mb-6 flex flex-wrap justify-between items-end gap-4">
@@ -69,7 +85,7 @@ export default function TeacherAnalyticsPage() {
           <p className="text-sm text-[var(--text-muted)]">View performance trends and question-wise accuracy.</p>
         </div>
         <div className="flex gap-4 items-center">
-          <Select value={selectedTest} onValueChange={setSelectedTest}>
+          <Select value={selectedTest} onValueChange={handleSelectTest}>
             <SelectTrigger className="w-[250px]">
               <SelectValue placeholder="Select a test" />
             </SelectTrigger>

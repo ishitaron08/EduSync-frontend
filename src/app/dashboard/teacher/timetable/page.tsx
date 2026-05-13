@@ -48,7 +48,7 @@ export default function TeacherTimetablePage() {
           timetables.map((tt, idx) => (
             <Card key={idx} className="p-6">
               <h2 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">
-                {tt.year} Term {tt.term} Schedule {tt.sectionId ? `(Section)` : ""}
+                {tt.year} Schedule {tt.section?.sectionCode ? `(${tt.section.sectionCode})` : ""}
               </h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
@@ -64,11 +64,11 @@ export default function TeacherTimetablePage() {
                   <tbody className="divide-y divide-[var(--border-subtle)]">
                     {tt.slots?.map((slot: any, sIdx: number) => (
                       <tr key={sIdx} className="hover:bg-[var(--bg-surface)]">
-                        <td className="px-4 py-3 capitalize">{slot.dayOfWeek}</td>
+                        <td className="px-4 py-3 capitalize">{slot.day || slot.dayOfWeek}</td>
                         <td className="px-4 py-3 font-mono text-xs">{slot.startTime} - {slot.endTime}</td>
                         <td className="px-4 py-3 font-semibold">{slot.subject}</td>
                         <td className="px-4 py-3">{slot.room}</td>
-                        <td className="px-4 py-3 capitalize">{slot.type}</td>
+                        <td className="px-4 py-3 capitalize">{slot.type || "class"}</td>
                       </tr>
                     ))}
                     {(!tt.slots || tt.slots.length === 0) && (

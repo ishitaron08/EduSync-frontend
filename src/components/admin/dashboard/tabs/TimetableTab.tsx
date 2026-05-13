@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TabChrome } from "../TabChrome";
 import { DataState } from "../DataState";
 import { Card } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
-import { Plus, Trash2, Calendar as CalendarIcon } from "lucide-react";
+import { Plus, Trash2, Calendar as CalendarIcon, Edit2, FileText, Check, X, User, MapPin, AlertCircle } from "lucide-react";
 
 type Slot = {
   day: string;
@@ -17,11 +18,14 @@ type Slot = {
   className: string;
   room: string;
   subject: string;
-  teacher: string;
+  teacher: string | { _id: string; name: string; email: string };
 };
 
 type Timetable = {
+  _id?: string;
   sectionId?: string;
+  section?: string;
+  term?: string;
   year: number;
   slots: Slot[];
 };
@@ -36,33 +40,96 @@ type Teacher = {
 type Section = {
   _id: string;
   sectionCode: string;
-  course: { title: string };
+  term: string;
+  year: number;
+  course: { _id?: string; code?: string; name?: string; title?: string };
+  enrolledCount?: number;
+};
+
+type MasterTimetableInfo = {
+  _id: string;
+  sectionId: string | { _id: string };
+  section?: string | { _id: string };
+  className: string;
+  term?: string;
+  year: number;
 };
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
 
 export function TimetableTab() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [sections, setSections] = useState<Section[]>([]);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [masterTimetables, setMasterTimetables] = useState<MasterTimetableInfo[]>([]);
 
   const [sectionId, setSectionId] = useState("");
-  const [className, setClassName] = useState("");
+  const [sectionTerm, setSectionTerm] = useState("fall");
+  const [sectionYear, setSectionYear] = useState(new Date().getFullYear());
   const [timetable, setTimetable] = useState<Timetable | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("ready");
   const [error, setError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  
+  // Track if current section has a timetable
+  const [hasExistingTimetable, setHasExistingTimetable] = useState(false);
   
   // Form for adding a slot
   const [activeSlot, setActiveSlot] = useState<{day: string, time: string} | null>(null);
   const [slotForm, setSlotForm] = useState({ subject: "", teacher: "", room: "" });
 
+  function writeTimetableUrl(section: Section | null, mode?: "edit" | "new") {
+    const params = new URLSearchParams(searchParams.toString());
+    if (pathname.endsWith("/dashboard/admin")) {
+      params.set("tab", "timetable");
+    }
+
+    if (!section) {
+      params.delete("section");
+      params.delete("mode");
+      params.delete("term");
+      params.delete("year");
+    } else {
+      params.set("section", section._id);
+      params.set("mode", mode ?? (checkExistingTimetable(section._id) ? "edit" : "new"));
+      params.set("term", section.term || "fall");
+      params.set("year", String(section.year || new Date().getFullYear()));
+    }
+
+    const nextQuery = params.toString();
+    router.push(nextQuery ? `${pathname}?${nextQuery}` : pathname, { scroll: false });
+  }
+
+  function selectSection(section: Section, mode?: "edit" | "new", pushUrl = true) {
+    setSectionId(section._id);
+    setSectionTerm(section.term || "fall");
+    setSectionYear(section.year || new Date().getFullYear());
+    if (pushUrl) {
+      writeTimetableUrl(section, mode);
+    }
+  }
+
+  function clearSelectedSection() {
+    setSectionId("");
+    setTimetable(null);
+    setHasExistingTimetable(false);
+    setActiveSlot(null);
+    setError(null);
+    writeTimetableUrl(null);
+  }
+
+  // Load initial data
   useEffect(() => {
     let alive = true;
     async function loadInitialData() {
       try {
-        const [teachersRes, sectionsRes] = await Promise.all([
+        const [teachersRes, sectionsRes, timetablesRes] = await Promise.all([
           api.get("/admin/users?role=teacher&limit=100"),
-          api.get("/admin/sections")
+          api.get("/admin/sections"),
+          api.get("/admin/timetable/master/list")
         ]);
         if (alive) {
           const fetchedTeachers = teachersRes.data.users || teachersRes.data.data || teachersRes.data;
@@ -71,64 +138,123 @@ export function TimetableTab() {
           const fetchedSections = sectionsRes.data;
           setSections(Array.isArray(fetchedSections) ? fetchedSections : []);
           
-          if (fetchedSections && fetchedSections.length > 0) {
-             setSectionId(fetchedSections[0]._id);
-             setClassName(`${fetchedSections[0].course?.title || "Course"} - ${fetchedSections[0].sectionCode}`);
-          }
+          const fetchedTimetables = timetablesRes.data;
+          setMasterTimetables(Array.isArray(fetchedTimetables) ? fetchedTimetables : []);
+          
+          setStatus("ready");
         }
       } catch(e) {
         console.error("Failed to fetch initial data", e);
+        setError("Failed to load initial data");
+        setStatus("error");
       }
     }
     loadInitialData();
     return () => { alive = false; };
   }, []);
 
+  // Check if section has an existing timetable
+  const getTimetableSectionId = (entry: MasterTimetableInfo) => {
+    if (typeof entry.sectionId === "object" && entry.sectionId?._id) return entry.sectionId._id;
+    if (typeof entry.section === "object" && entry.section?._id) return entry.section._id;
+    if (typeof entry.section === "string") return entry.section;
+    return String(entry.sectionId);
+  };
+
+  const checkExistingTimetable = (sectId: string) => {
+    return masterTimetables.some(t => getTimetableSectionId(t) === String(sectId));
+  };
+
+  useEffect(() => {
+    if (sections.length === 0) return;
+
+    const urlSectionId = searchParams.get("section");
+    if (!urlSectionId) {
+      if (sectionId) {
+        setSectionId("");
+        setTimetable(null);
+        setHasExistingTimetable(false);
+        setActiveSlot(null);
+      }
+      return;
+    }
+
+    if (urlSectionId === sectionId) return;
+
+    const section = sections.find(s => s._id === urlSectionId);
+    if (!section) return;
+
+    setSectionId(section._id);
+    setSectionTerm(searchParams.get("term") || section.term || "fall");
+    setSectionYear(Number(searchParams.get("year") || section.year || new Date().getFullYear()));
+  }, [searchParams, sections, sectionId]);
+
+  // Load timetable when section is selected
   useEffect(() => {
     if (!sectionId) return;
     
     let alive = true;
     async function loadMasterTimetable() {
       setStatus("loading");
+      setError(null);
       try {
-        const { data } = await api.get<Timetable>(`/admin/timetable/master?sectionId=${sectionId}`);
+        const { data } = await api.get<Timetable>(`/admin/timetable/master?sectionId=${sectionId}&term=${sectionTerm}&year=${sectionYear}`);
         if (alive) {
-          // If no timetable returned (empty slots), initialize a fresh one
           if (!data || !data.slots || data.slots.length === 0) {
-             setTimetable({ sectionId, year: new Date().getFullYear(), slots: [] });
+            setTimetable({ sectionId, section: sectionId, term: sectionTerm, year: sectionYear, slots: [] });
+            setHasExistingTimetable(false);
           } else {
-             setTimetable(data);
+            setTimetable(data);
+            setHasExistingTimetable(true);
           }
           setStatus("ready");
         }
       } catch (err: any) {
         if (alive) {
-          // If 404 or not found, it means timetable doesn't exist yet, we can create a new one
           if (err?.response?.status === 404) {
-             setTimetable({ sectionId, year: new Date().getFullYear(), slots: [] });
-             setStatus("ready");
+            setTimetable({ sectionId, section: sectionId, term: sectionTerm, year: sectionYear, slots: [] });
+            setHasExistingTimetable(false);
+            setStatus("ready");
           } else {
-             setError(describeApiError(err));
-             setStatus("error");
+            setError(describeApiError(err));
+            setStatus("error");
           }
         }
       }
     }
     loadMasterTimetable();
     return () => { alive = false; };
-  }, [sectionId]);
+  }, [sectionId, sectionTerm, sectionYear]);
+
+  // Refresh master timetables list
+  const refreshMasterTimetables = async () => {
+    try {
+      const res = await api.get("/admin/timetable/master/list");
+      setMasterTimetables(Array.isArray(res.data) ? res.data : []);
+    } catch (e) {
+      console.error("Failed to refresh timetables list", e);
+    }
+  };
 
   async function handleSaveTimetable() {
     if (!timetable) return;
+    setSaveStatus("saving");
+    setError(null);
     try {
       await api.put("/admin/timetable/master", {
         sectionId,
-        year: new Date().getFullYear(),
+        term: sectionTerm,
+        year: sectionYear,
         slots: timetable.slots
       });
-      alert("Timetable saved successfully!");
+      setSaveStatus("saved");
+      setHasExistingTimetable(true);
+      await refreshMasterTimetables();
+      setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (err) {
-      alert("Conflict detected or save failed: " + describeApiError(err));
+      setSaveStatus("error");
+      setError("Conflict detected or save failed: " + describeApiError(err));
+      setTimeout(() => setSaveStatus("idle"), 3000);
     }
   }
 
@@ -140,6 +266,9 @@ export function TimetableTab() {
     const [hh, mm] = activeSlot.time.split(":").map(Number);
     const endH = String(hh + 1).padStart(2, "0");
     const endTime = `${endH}:${String(mm).padStart(2, "0")}`;
+
+    const section = sections.find(s => s._id === sectionId);
+    const className = section ? `${section.course?.code || section.course?.name || "Course"} - ${section.sectionCode}` : "Class";
 
     const newSlot: Slot = {
       day: activeSlot.day,
@@ -171,50 +300,169 @@ export function TimetableTab() {
     return timetable?.slots.find(s => s.day === day && s.startTime === time);
   }
 
+  // Get teacher name from slot
+  const getTeacherName = (teacher: string | { _id: string; name: string; email: string }) => {
+    if (typeof teacher === "object" && teacher?.name) {
+      return teacher.name;
+    }
+    if (typeof teacher === "string") {
+      const t = teachers.find(t => (t._id || t.id) === teacher);
+      return t?.name || "Unknown";
+    }
+    return "Unknown";
+  };
+
+  // Sections grouped by timetable status
+  const sectionsWithTimetable = sections.filter(s => checkExistingTimetable(s._id));
+  const sectionsWithoutTimetable = sections.filter(s => !checkExistingTimetable(s._id));
+
+  const selectedSection = sections.find(s => s._id === sectionId);
+
   return (
     <TabChrome
       eyebrow="Timetable Management"
       title="Master Schedule Builder"
-      description="Select a section to build and manage its timetable."
+      description="Edit existing timetables or create new ones for sections."
       actions={
-        <Button onClick={handleSaveTimetable} variant="filled" className="gap-2">
-          <CalendarIcon className="h-4 w-4" /> Save Timetable
-        </Button>
+        sectionId && timetable && (
+          <Button 
+            onClick={handleSaveTimetable} 
+            variant="filled" 
+            className="gap-2"
+            disabled={saveStatus === "saving"}
+          >
+            {saveStatus === "saving" && <span className="animate-spin">⏳</span>}
+            {saveStatus === "saved" && <Check className="h-4 w-4" />}
+            {saveStatus === "error" && <X className="h-4 w-4" />}
+            {saveStatus === "idle" && <CalendarIcon className="h-4 w-4" />}
+            {saveStatus === "saving" ? "Saving..." : 
+             saveStatus === "saved" ? "Saved!" : 
+             saveStatus === "error" ? "Error" : 
+             hasExistingTimetable ? "Update Timetable" : "Create Timetable"}
+          </Button>
+        )
       }
     >
       <DataState status={status} error={error} loading="Loading schedule...">
         <div className="space-y-6">
-          <Card className="p-4 flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1">
-              <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Select Section</label>
-              <select 
-                className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                value={sectionId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setSectionId(val);
-                  const found = sections.find(s => s._id === val);
-                  if (found) setClassName(`${found.course?.title || "Course"} - ${found.sectionCode}`);
-                }}
-              >
-                {sections.length === 0 && <option value="" disabled>No sections available. Create one in the Sections tab.</option>}
-                {sections.map(s => (
-                  <option key={s._id} value={s._id}>
-                    {s.course?.title || "Unknown"} - {s.sectionCode}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex-1">
-              <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Section Details</label>
-              <Input value={className} readOnly className="mt-1 bg-[var(--bg-elevated)]" />
+          {/* Section Selection - Two Options */}
+          <Card className="p-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              {/* Option 1: Edit Existing Timetable */}
+              <div className="border border-[var(--border-subtle)] rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Edit2 className="h-4 w-4 text-[var(--accent-primary)]" />
+                  <h4 className="font-medium text-[var(--text-primary)]">Edit Existing Timetable</h4>
+                </div>
+                {sectionsWithTimetable.length === 0 ? (
+                  <p className="text-sm text-[var(--text-muted)]">No sections with timetables yet.</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {sectionsWithTimetable.map(s => (
+                      <button
+                        key={s._id}
+                        onClick={() => {
+                          selectSection(s, "edit");
+                        }}
+                        className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                          sectionId === s._id 
+                            ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)]/10' 
+                            : 'border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)]'
+                        }`}
+                      >
+                        <div className="font-medium text-[var(--text-primary)]">
+                          {s.course?.name || s.course?.title || "Unknown Course"}
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)]">
+                          {s.sectionCode} · {s.term} {s.year}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Option 2: Create New Timetable */}
+              <div className="border border-[var(--border-subtle)] rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText className="h-4 w-4 text-green-500" />
+                  <h4 className="font-medium text-[var(--text-primary)]">Create New Timetable</h4>
+                </div>
+                {sectionsWithoutTimetable.length === 0 ? (
+                  <p className="text-sm text-[var(--text-muted)]">All sections have timetables. Create a new section first.</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {sectionsWithoutTimetable.map(s => (
+                      <button
+                        key={s._id}
+                        onClick={() => {
+                          selectSection(s, "new");
+                        }}
+                        className={`w-full text-left p-3 rounded-lg border transition-colors ${
+                          sectionId === s._id 
+                            ? 'border-green-500 bg-green-500/10' 
+                            : 'border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)]'
+                        }`}
+                      >
+                        <div className="font-medium text-[var(--text-primary)]">
+                          {s.course?.name || s.course?.title || "Unknown Course"}
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)]">
+                          {s.sectionCode} · {s.term} {s.year} · {s.enrolledCount || 0} students
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
 
+          {/* Selected Section Info */}
+          {sectionId && selectedSection && (
+            <Card className={`p-4 ${hasExistingTimetable ? 'border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5' : 'border-green-500/30 bg-green-500/5'}`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                    {hasExistingTimetable ? "Editing Existing Timetable" : "Creating New Timetable"}
+                  </p>
+                  <p className="font-medium text-[var(--text-primary)] mt-1">
+                    {selectedSection.course?.name || selectedSection.course?.title || "Unknown Course"} - {selectedSection.sectionCode}
+                  </p>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {selectedSection.term?.charAt(0).toUpperCase()}{selectedSection.term?.slice(1)} {selectedSection.year}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {timetable?.slots?.length || 0} slots configured
+                  </p>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    {selectedSection.enrolledCount || 0} enrolled students
+                  </p>
+                  <Button variant="ghost" size="sm" className="mt-2" onClick={clearSelectedSection}>
+                    Back to timetable
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Error Display */}
+          {error && (
+            <Card className="p-4 border-[var(--accent-danger)]/30 bg-[var(--accent-danger)]/5">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-[var(--accent-danger)]" />
+                <p className="text-sm text-[var(--accent-danger)]">{error}</p>
+              </div>
+            </Card>
+          )}
+
+          {/* Slot Form */}
           {activeSlot && (
             <Card className="p-4 border-[var(--accent-primary)]">
               <h4 className="font-medium text-[var(--text-primary)] mb-4">
-                Assign Slot: {activeSlot.day.toUpperCase()} at {activeSlot.time}
+                Assign Slot: {activeSlot.day.charAt(0).toUpperCase() + activeSlot.day.slice(1)} at {activeSlot.time}
               </h4>
               <form onSubmit={handleAddSlot} className="flex gap-4 items-end flex-wrap">
                 <div className="flex-1 min-w-[200px]">
@@ -245,54 +493,81 @@ export function TimetableTab() {
             </Card>
           )}
 
-          {timetable && timetable.slots && (
-          <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] mt-6">
-            <table className="min-w-full text-left text-sm border-collapse">
-              <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
-                <tr>
-                  <th className="px-4 py-3 font-medium border-r border-[var(--border-subtle)] w-24">Time</th>
-                  {DAYS.map(day => (
-                    <th key={day} className="px-4 py-3 font-medium capitalize text-center border-r border-[var(--border-subtle)]">{day}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {TIMES.map(time => (
-                  <tr key={time} className="border-b border-[var(--border-subtle)]">
-                    <td className="px-4 py-3 border-r border-[var(--border-subtle)] font-medium text-[var(--text-muted)] bg-[var(--bg-elevated)]">
-                      {time}
-                    </td>
-                    {DAYS.map(day => {
-                      const slot = getSlotAt(day, time);
-                      return (
-                        <td key={`${day}-${time}`} className="p-2 border-r border-[var(--border-subtle)] text-center relative group min-w-[150px]">
-                          {slot ? (
-                            <div className="bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 rounded-lg p-2 flex flex-col items-center">
-                              <span className="font-semibold text-[var(--text-primary)]">{slot.subject}</span>
-                              <span className="text-xs text-[var(--text-muted)]">Room: {slot.room}</span>
-                              <button 
-                                onClick={() => removeSlot(day, time)}
-                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 text-[var(--accent-danger)] hover:bg-[var(--accent-danger)]/10 rounded"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            </div>
-                          ) : (
-                            <button 
-                              onClick={() => setActiveSlot({ day, time })}
-                              className="w-full h-12 flex items-center justify-center border-2 border-dashed border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-muted)] transition-all"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </button>
-                          )}
-                        </td>
-                      );
-                    })}
+          {/* Timetable Grid */}
+          {sectionId && timetable && (
+            <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+              <table className="min-w-full text-left text-sm border-collapse">
+                <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
+                  <tr>
+                    <th className="px-4 py-3 font-medium border-r border-[var(--border-subtle)] w-24">Time</th>
+                    {DAYS.map(day => (
+                      <th key={day} className="px-4 py-3 font-medium capitalize text-center border-r border-[var(--border-subtle)]">{day}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {TIMES.map(time => (
+                    <tr key={time} className="border-b border-[var(--border-subtle)]">
+                      <td className="px-4 py-3 border-r border-[var(--border-subtle)] font-medium text-[var(--text-muted)] bg-[var(--bg-elevated)]">
+                        {time}
+                      </td>
+                      {DAYS.map(day => {
+                        const slot = getSlotAt(day, time);
+                        return (
+                          <td key={`${day}-${time}`} className="p-2 border-r border-[var(--border-subtle)] text-center relative group min-w-[150px]">
+                            {slot ? (
+                              <div className="bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 rounded-lg p-2">
+                                <span className="font-semibold text-[var(--text-primary)]">{slot.subject}</span>
+                                <div className="flex items-center justify-center gap-1 mt-1 text-xs text-[var(--text-muted)]">
+                                  <MapPin className="h-3 w-3" />
+                                  <span>{slot.room}</span>
+                                </div>
+                                <div className="flex items-center justify-center gap-1 text-xs text-[var(--text-muted)]">
+                                  <User className="h-3 w-3" />
+                                  <span>{getTeacherName(slot.teacher)}</span>
+                                </div>
+                                <button 
+                                  onClick={() => removeSlot(day, time)}
+                                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 text-[var(--accent-danger)] hover:bg-[var(--accent-danger)]/10 rounded transition-opacity"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => setActiveSlot({ day, time })}
+                                className="w-full h-16 flex flex-col items-center justify-center border-2 border-dashed border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-muted)] transition-all"
+                              >
+                                <Plus className="h-4 w-4" />
+                                <span className="text-xs mt-1">Add Slot</span>
+                              </button>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* No Section Selected */}
+          {!sectionId && sections.length > 0 && (
+            <Card className="p-8 text-center">
+              <CalendarIcon className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-4" />
+              <p className="text-[var(--text-primary)] font-medium">Select a section to manage its timetable</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">Choose from existing timetables to edit, or create a new one for a section without a timetable.</p>
+            </Card>
+          )}
+
+          {/* No Sections */}
+          {!sectionId && sections.length === 0 && (
+            <Card className="p-8 text-center">
+              <FileText className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-4" />
+              <p className="text-[var(--text-primary)] font-medium">No sections available</p>
+              <p className="text-sm text-[var(--text-muted)] mt-1">Create a section in the Sections tab first.</p>
+            </Card>
           )}
         </div>
       </DataState>

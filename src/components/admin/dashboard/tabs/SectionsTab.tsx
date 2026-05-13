@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TabChrome } from "../TabChrome";
 import { DataState } from "../DataState";
 import { Card } from "@/components/ui/card";
@@ -12,7 +13,16 @@ import { Plus, Trash2, Edit2, Users, X, Search, UserPlus } from "lucide-react";
 
 
 type Course = { _id: string; name: string; code: string; id?: string };
-type Student = { _id: string; name: string; email: string };
+type StudentEnrollment = {
+  section?: {
+    _id: string;
+    sectionCode: string;
+    term: string;
+    year: number;
+    course?: Course;
+  };
+};
+type Student = { _id: string; name: string; email: string; enrollment?: StudentEnrollment | null };
 type EnrolledStudent = { _id: string; student: Student; enrolledAt: string };
 type Section = {
   _id: string;
@@ -25,6 +35,9 @@ type Section = {
 };
 
 export function SectionsTab() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [sections, setSections] = useState<Section[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
   
@@ -48,6 +61,38 @@ export function SectionsTab() {
   
   const defaultForm = { sectionCode: "", term: "fall", year: new Date().getFullYear(), capacity: 60, course: "" };
   const [form, setForm] = useState(defaultForm);
+
+  function writeSectionUrl(action: "new" | "edit" | "manage" | null, sectionId?: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (pathname.endsWith("/dashboard/admin")) {
+      params.set("tab", "sections");
+    }
+
+    if (!action) {
+      params.delete("sectionAction");
+      params.delete("sectionId");
+    } else {
+      params.set("sectionAction", action);
+      if (sectionId) {
+        params.set("sectionId", sectionId);
+      } else {
+        params.delete("sectionId");
+      }
+    }
+
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }
+
+  function closeSectionWorkspace(pushUrl = true) {
+    setIsFormOpen(false);
+    setEditingId(null);
+    setEditingSectionId(null);
+    setIsStudentModalOpen(false);
+    setSelectedStudents([]);
+    setForm(defaultForm);
+    if (pushUrl) writeSectionUrl(null);
+  }
 
   async function loadData() {
     try {
@@ -105,6 +150,46 @@ export function SectionsTab() {
     }
   }, [isStudentModalOpen, editingSectionId]);
 
+  useEffect(() => {
+    const action = searchParams.get("sectionAction");
+    const urlSectionId = searchParams.get("sectionId");
+
+    if (!action) {
+      if (isFormOpen || isStudentModalOpen || editingId || editingSectionId) {
+        closeSectionWorkspace(false);
+      }
+      return;
+    }
+
+    if (action === "new") {
+      if (!isFormOpen || editingId) {
+        setEditingId(null);
+        setForm(defaultForm);
+        setSelectedStudents([]);
+        setIsStudentModalOpen(false);
+        setEditingSectionId(null);
+        setIsFormOpen(true);
+      }
+      return;
+    }
+
+    if (!urlSectionId || sections.length === 0) return;
+    const section = sections.find(sec => sec._id === urlSectionId);
+    if (!section) return;
+
+    if (action === "edit" && editingId !== section._id) {
+      setIsStudentModalOpen(false);
+      handleEditSection(section, false);
+      return;
+    }
+
+    if (action === "manage" && editingSectionId !== section._id) {
+      setIsFormOpen(false);
+      setEditingId(null);
+      openStudentModal(section._id, false);
+    }
+  }, [searchParams, sections, isFormOpen, isStudentModalOpen, editingId, editingSectionId]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     try {
@@ -114,10 +199,7 @@ export function SectionsTab() {
       } else {
         await api.post("/admin/sections", payload);
       }
-      setIsFormOpen(false);
-      setEditingId(null);
-      setForm(defaultForm);
-      setSelectedStudents([]);
+      closeSectionWorkspace();
       loadData();
     } catch (err) {
       alert("Failed to save section: " + describeApiError(err));
@@ -154,7 +236,7 @@ export function SectionsTab() {
     }
   }
 
-  function handleEditSection(sec: Section) {
+  function handleEditSection(sec: Section, pushUrl = true) {
     setForm({
       sectionCode: sec.sectionCode,
       term: sec.term,
@@ -163,7 +245,10 @@ export function SectionsTab() {
       course: sec.course?._id || ""
     });
     setEditingId(sec._id);
+    setIsStudentModalOpen(false);
+    setEditingSectionId(null);
     setIsFormOpen(true);
+    if (pushUrl) writeSectionUrl("edit", sec._id);
     // Load currently enrolled students for this section
     loadEnrolledStudentsForEdit(sec._id);
   }
@@ -189,6 +274,8 @@ export function SectionsTab() {
   }
 
   function toggleStudentSelection(studentId: string) {
+    const student = allStudents.find(s => s._id === studentId);
+    if (isStudentLocked(student)) return;
     setSelectedStudents(prev => 
       prev.includes(studentId) 
         ? prev.filter(id => id !== studentId)
@@ -196,9 +283,30 @@ export function SectionsTab() {
     );
   }
 
-  function openStudentModal(sectionId: string) {
+  function openStudentModal(sectionId: string, pushUrl = true) {
+    setIsFormOpen(false);
+    setEditingId(null);
     setEditingSectionId(sectionId);
     setIsStudentModalOpen(true);
+    if (pushUrl) writeSectionUrl("manage", sectionId);
+  }
+
+  function getEnrollmentSectionId(student?: Student | null) {
+    return student?.enrollment?.section?._id ?? null;
+  }
+
+  function isStudentLocked(student?: Student | null) {
+    const enrolledSectionId = getEnrollmentSectionId(student);
+    if (!enrolledSectionId) return false;
+    const currentSectionId = editingId || editingSectionId;
+    return !currentSectionId || enrolledSectionId !== currentSectionId;
+  }
+
+  function getEnrollmentLabel(student?: Student | null) {
+    const section = student?.enrollment?.section;
+    if (!section) return "";
+    const courseLabel = section.course?.code || section.course?.name || "Course";
+    return `${courseLabel} ${section.sectionCode}`;
   }
 
   return (
@@ -207,7 +315,15 @@ export function SectionsTab() {
       title="Sections"
       description="Create and manage class sections, assign courses and students."
       actions={
-        <Button onClick={() => { setIsFormOpen(!isFormOpen); setEditingId(null); setForm(defaultForm); setSelectedStudents([]); }} variant="filled" className="gap-2">
+        <Button onClick={() => {
+          setIsFormOpen(true);
+          setEditingId(null);
+          setForm(defaultForm);
+          setSelectedStudents([]);
+          setIsStudentModalOpen(false);
+          setEditingSectionId(null);
+          writeSectionUrl("new");
+        }} variant="filled" className="gap-2">
           <Plus className="h-4 w-4" /> New Section
         </Button>
       }
@@ -282,24 +398,33 @@ export function SectionsTab() {
                         ) : allStudents.length === 0 ? (
                           <div className="text-center p-4 text-[var(--text-muted)]">No students found</div>
                         ) : (
-                          allStudents.map(student => (
+                          allStudents.map(student => {
+                            const locked = isStudentLocked(student);
+                            return (
                             <div 
                               key={student._id} 
-                              className={`flex items-center gap-2 p-2 rounded cursor-pointer hover:bg-[var(--bg-elevated)] transition-colors ${selectedStudents.includes(student._id) ? 'bg-[var(--accent-primary)]/10' : ''}`}
+                              className={`flex items-center gap-2 p-2 rounded transition-colors ${locked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer hover:bg-[var(--bg-elevated)]'} ${selectedStudents.includes(student._id) ? 'bg-[var(--accent-primary)]/10' : ''}`}
                               onClick={() => toggleStudentSelection(student._id)}
                             >
                               <input 
                                 type="checkbox" 
                                 checked={selectedStudents.includes(student._id)}
+                                disabled={locked}
                                 onChange={() => {}}
                                 className="rounded"
                               />
                               <div className="flex-1">
                                 <div className="text-sm font-medium">{student.name}</div>
                                 <div className="text-xs text-[var(--text-muted)]">{student.email}</div>
+                                {locked && (
+                                  <div className="text-xs text-[var(--accent-danger)]">
+                                    Already in {getEnrollmentLabel(student)}
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          ))
+                          );
+                          })
                         )}
                       </div>
                     </div>
@@ -340,7 +465,7 @@ export function SectionsTab() {
 
                 <div className="flex gap-2 justify-end">
                   <Button type="submit" variant="filled">Save Section</Button>
-                  <Button type="button" variant="ghost" onClick={() => { setIsFormOpen(false); setSelectedStudents([]); }}>Cancel</Button>
+                  <Button type="button" variant="ghost" onClick={() => closeSectionWorkspace()}>Cancel</Button>
                 </div>
               </form>
             </Card>
@@ -397,7 +522,7 @@ export function SectionsTab() {
           <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col m-4">
             <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
               <h3 className="font-medium text-lg">Manage Students</h3>
-              <Button variant="ghost" size="sm" onClick={() => setIsStudentModalOpen(false)}>
+              <Button variant="ghost" size="sm" onClick={() => closeSectionWorkspace()}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -432,19 +557,29 @@ export function SectionsTab() {
                     allStudents
                       .filter(s => !enrolledStudents.some(es => es.student._id === s._id))
                       .slice(0, 5)
-                      .map(student => (
+                      .map(student => {
+                        const locked = isStudentLocked(student);
+                        return (
                         <div 
                           key={student._id}
-                          className="flex items-center justify-between p-2 hover:bg-[var(--bg-elevated)] cursor-pointer"
-                          onClick={() => handleAddStudentToSection(student._id)}
+                          className={`flex items-center justify-between p-2 ${locked ? 'cursor-not-allowed opacity-60' : 'hover:bg-[var(--bg-elevated)] cursor-pointer'}`}
+                          onClick={() => {
+                            if (!locked) handleAddStudentToSection(student._id);
+                          }}
                         >
                           <div>
                             <div className="font-medium">{student.name}</div>
                             <div className="text-xs text-[var(--text-muted)]">{student.email}</div>
+                            {locked && (
+                              <div className="text-xs text-[var(--accent-danger)]">
+                                Already in {getEnrollmentLabel(student)}
+                              </div>
+                            )}
                           </div>
-                          <UserPlus className="h-4 w-4 text-[var(--accent-primary)]" />
+                          {!locked && <UserPlus className="h-4 w-4 text-[var(--accent-primary)]" />}
                         </div>
-                      ))
+                      );
+                      })
                   )}
                 </div>
               )}
@@ -478,7 +613,7 @@ export function SectionsTab() {
             </div>
             
             <div className="p-4 border-t border-[var(--border-subtle)] flex justify-end">
-              <Button variant="filled" onClick={() => setIsStudentModalOpen(false)}>Done</Button>
+              <Button variant="filled" onClick={() => closeSectionWorkspace()}>Done</Button>
             </div>
           </Card>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { hueFromString } from "@/lib/hueFromString";
@@ -16,10 +17,20 @@ type LeaderboardEntry = {
 
 export default function StudentLeaderboardPage() {
   const allowed = useDashboardGuard("student");
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState("all_time");
+
+  useEffect(() => {
+    const urlScope = searchParams.get("scope");
+    if (urlScope === "weekly" || urlScope === "monthly" || urlScope === "all_time") {
+      setScope(urlScope);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!allowed) return;
@@ -41,6 +52,13 @@ export default function StudentLeaderboardPage() {
     return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
   }
 
+  function handleScopeChange(nextScope: string) {
+    setScope(nextScope);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("scope", nextScope);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
   // Find user's rank
   let userRank = leaderboard.findIndex(entry => entry.studentId === profile?._id) + 1;
   if (userRank === 0 && profile) {
@@ -58,7 +76,7 @@ export default function StudentLeaderboardPage() {
       </div>
 
       <div className="flex justify-center mb-8">
-        <Tabs value={scope} onValueChange={setScope} className="w-[400px]">
+        <Tabs value={scope} onValueChange={handleScopeChange} className="w-[400px]">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="weekly">Weekly</TabsTrigger>
             <TabsTrigger value="monthly">Monthly</TabsTrigger>

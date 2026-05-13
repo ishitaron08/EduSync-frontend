@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { describeApiError } from "@/lib/apiErrors";
 import api from "@/lib/api";
@@ -11,10 +12,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClipboardCheck } from "lucide-react";
 
+type TeacherSection = {
+  _id: string;
+  sectionCode: string;
+  course?: { code?: string; name?: string };
+};
+
 export default function TeacherTestsPage() {
   const allowed = useDashboardGuard("teacher");
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [sections, setSections] = useState<TeacherSection[]>([]);
   
   // Common
   const [title, setTitle] = useState("");
@@ -22,6 +33,30 @@ export default function TeacherTestsPage() {
   const [duration, setDuration] = useState("30");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [testTypeTab, setTestTypeTab] = useState<"mcq" | "written" | "history">("mcq");
+
+  useEffect(() => {
+    if (!allowed) return;
+    api.get<TeacherSection[]>("/teacher/sections")
+      .then((res) => {
+        const fetched = Array.isArray(res.data) ? res.data : [];
+        setSections(fetched);
+        const urlSection = searchParams.get("section");
+        if (urlSection && fetched.some(section => section._id === urlSection)) {
+          setSectionId(urlSection);
+        } else if (!sectionId && fetched.length > 0) {
+          setSectionId(fetched[0]._id);
+        }
+      })
+      .catch((e) => setLoadErr(describeApiError(e)));
+  }, [allowed, sectionId, searchParams]);
+
+  useEffect(() => {
+    const urlType = searchParams.get("type");
+    if (urlType === "mcq" || urlType === "written" || urlType === "history") {
+      setTestTypeTab(urlType);
+    }
+  }, [searchParams]);
 
   if (!allowed) {
     return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
@@ -33,7 +68,7 @@ export default function TeacherTestsPage() {
       setSuccess(null);
       const payload: any = {
         title,
-        sectionId,
+        section: sectionId,
         type,
         durationMinutes: parseInt(duration),
         startTime: new Date(startTime).toISOString(),
@@ -60,6 +95,24 @@ export default function TeacherTestsPage() {
     }
   };
 
+  function updateTestsUrl(next: { section?: string; type?: "mcq" | "written" | "history" }) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next.section) params.set("section", next.section);
+    if (next.type) params.set("type", next.type);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
+  function handleSectionChange(nextSection: string) {
+    setSectionId(nextSection);
+    updateTestsUrl({ section: nextSection, type: testTypeTab });
+  }
+
+  function handleTypeChange(value: string) {
+    const nextType = value as "mcq" | "written" | "history";
+    setTestTypeTab(nextType);
+    updateTestsUrl({ section: sectionId, type: nextType });
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
       <div className="mb-6">
@@ -70,7 +123,7 @@ export default function TeacherTestsPage() {
       {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)]">{loadErr}</p>}
       {success && <p className="mb-4 text-sm text-[var(--accent-primary)]">{success}</p>}
 
-      <Tabs defaultValue="mcq" className="space-y-6">
+      <Tabs value={testTypeTab} onValueChange={handleTypeChange} className="space-y-6">
         <TabsList className="bg-[var(--bg-elevated)] p-1 rounded-lg">
           <TabsTrigger value="mcq" className="data-[state=active]:bg-[var(--bg-surface)]">MCQ Test</TabsTrigger>
           <TabsTrigger value="written" className="data-[state=active]:bg-[var(--bg-surface)]">Written Test</TabsTrigger>
@@ -86,8 +139,15 @@ export default function TeacherTestsPage() {
                 <Input className="mt-1" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Midterm Quiz" />
               </div>
               <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">Section ID</label>
-                <Input className="mt-1" value={sectionId} onChange={e => setSectionId(e.target.value)} placeholder="Section ObjectId" />
+                <label className="text-xs uppercase text-[var(--text-muted)]">Section</label>
+                <select className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm" value={sectionId} onChange={e => handleSectionChange(e.target.value)}>
+                  <option value="" disabled>Select section...</option>
+                  {sections.map(section => (
+                    <option key={section._id} value={section._id}>
+                      {section.course?.code ? `${section.course.code} - ` : ""}{section.course?.name || "Course"} ({section.sectionCode})
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs uppercase text-[var(--text-muted)]">Duration (Mins)</label>
@@ -126,8 +186,15 @@ export default function TeacherTestsPage() {
                 <Input className="mt-1" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Final Essay" />
               </div>
               <div>
-                <label className="text-xs uppercase text-[var(--text-muted)]">Section ID</label>
-                <Input className="mt-1" value={sectionId} onChange={e => setSectionId(e.target.value)} placeholder="Section ObjectId" />
+                <label className="text-xs uppercase text-[var(--text-muted)]">Section</label>
+                <select className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm" value={sectionId} onChange={e => handleSectionChange(e.target.value)}>
+                  <option value="" disabled>Select section...</option>
+                  {sections.map(section => (
+                    <option key={section._id} value={section._id}>
+                      {section.course?.code ? `${section.course.code} - ` : ""}{section.course?.name || "Course"} ({section.sectionCode})
+                    </option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="text-xs uppercase text-[var(--text-muted)]">Start Time</label>

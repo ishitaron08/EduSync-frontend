@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { useDashboardGuard } from "@/lib/authGuard";
@@ -11,8 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { QRCodeSVG } from "qrcode.react";
 import { ScanLine } from "lucide-react";
 
+type TeacherSection = {
+  _id: string;
+  sectionCode: string;
+  course?: { code?: string; name?: string };
+};
+
 export default function TeacherAttendancePage() {
   const allowed = useDashboardGuard("teacher");
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [sectionId, setSectionId] = useState("");
   const [slotKey, setSlotKey] = useState("SLOT-1");
   const [token, setToken] = useState<string | null>(null);
@@ -20,6 +30,30 @@ export default function TeacherAttendancePage() {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [scannedStudents, setScannedStudents] = useState<any[]>([]);
+  const [sections, setSections] = useState<TeacherSection[]>([]);
+
+  useEffect(() => {
+    if (!allowed) return;
+    api.get<TeacherSection[]>("/teacher/sections")
+      .then((res) => {
+        const fetched = Array.isArray(res.data) ? res.data : [];
+        setSections(fetched);
+        const urlSection = searchParams.get("section");
+        if (urlSection && fetched.some(section => section._id === urlSection)) {
+          setSectionId(urlSection);
+        } else if (!sectionId && fetched.length > 0) {
+          setSectionId(fetched[0]._id);
+        }
+      })
+      .catch((e) => setLoadErr(describeApiError(e)));
+  }, [allowed, sectionId, searchParams]);
+
+  useEffect(() => {
+    const urlSlot = searchParams.get("slot");
+    if (urlSlot) {
+      setSlotKey(urlSlot);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!expiresAt) return;
@@ -75,6 +109,13 @@ export default function TeacherAttendancePage() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  function updateAttendanceUrl(nextSectionId = sectionId, nextSlotKey = slotKey) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextSectionId) params.set("section", nextSectionId);
+    if (nextSlotKey) params.set("slot", nextSlotKey);
+    router.push(`${pathname}?${params.toString()}`, { scroll: false });
+  }
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
       <div className="mb-6">
@@ -89,18 +130,30 @@ export default function TeacherAttendancePage() {
           <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Start Session</h2>
           <div className="space-y-4">
             <div>
-              <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Section ID</label>
-              <Input 
-                className="mt-1" 
-                placeholder="Paste Section ObjectId" 
+              <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Section</label>
+              <select
+                className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm"
                 value={sectionId} 
-                onChange={(e) => setSectionId(e.target.value)} 
+                onChange={(e) => {
+                  setSectionId(e.target.value);
+                  updateAttendanceUrl(e.target.value, slotKey);
+                }} 
                 disabled={!!token}
-              />
+              >
+                <option value="" disabled>Select section...</option>
+                {sections.map(section => (
+                  <option key={section._id} value={section._id}>
+                    {section.course?.code ? `${section.course.code} - ` : ""}{section.course?.name || "Course"} ({section.sectionCode})
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Time Slot</label>
-              <Select value={slotKey} onValueChange={setSlotKey} disabled={!!token}>
+              <Select value={slotKey} onValueChange={(value) => {
+                setSlotKey(value);
+                updateAttendanceUrl(sectionId, value);
+              }} disabled={!!token}>
                 <SelectTrigger className="mt-1 w-full bg-[var(--bg-surface)]">
                   <SelectValue placeholder="Select a slot" />
                 </SelectTrigger>
