@@ -76,7 +76,7 @@ export default function StudentLeaderboardPage() {
       </div>
 
       <div className="flex justify-center mb-8">
-        <Tabs value={scope} onValueChange={handleScopeChange} className="w-[400px]">
+        <Tabs value={scope} onValueChange={handleScopeChange} className="w-full max-w-[400px]">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="weekly">Weekly</TabsTrigger>
             <TabsTrigger value="monthly">Monthly</TabsTrigger>

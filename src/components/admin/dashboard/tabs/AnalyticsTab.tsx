@@ -115,7 +115,26 @@ export function AnalyticsTab() {
 
           <Card className="p-4 md:p-5">
             <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)] mb-4">Students Needing Intervention (Completion &lt; 40%)</p>
-            <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)]">
+            <div className="grid gap-3 md:hidden">
+              {data?.decliningStudents?.length ? (
+                data.decliningStudents.map((student) => (
+                  <div key={student._id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words font-medium text-[var(--text-primary)]">{student.name}</p>
+                        <p className="mt-1 break-all text-xs text-[var(--text-muted)]">{student.email}</p>
+                      </div>
+                      <Badge tone="amber">Declining</Badge>
+                    </div>
+                    <p className="mt-4 font-mono text-sm text-[var(--accent-danger)]">{student.completionRate.toFixed(1)}% task completion</p>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">No students currently need intervention.</div>
+              )}
+            </div>
+
+            <div className="hidden rounded-2xl border border-[var(--border-subtle)] md:block">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)]">
                   <tr>

@@ -16,9 +16,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className="h-full antialiased"
+      className="h-full overflow-hidden antialiased"
     >
-      <body className="flex min-h-full flex-col" suppressHydrationWarning>
+      <body className="flex h-full flex-col overflow-hidden" suppressHydrationWarning>
         <NoiseOverlay />
         <AppShell>{children}</AppShell>
       </body>

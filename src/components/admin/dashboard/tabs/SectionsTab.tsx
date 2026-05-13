@@ -7,6 +7,7 @@ import { DataState } from "../DataState";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { Plus, Trash2, Edit2, Users, X, Search, UserPlus } from "lucide-react";
@@ -335,12 +336,12 @@ export function SectionsTab() {
             <Card className="p-4 border-[var(--accent-primary)]">
               <h4 className="font-medium text-[var(--text-primary)] mb-4">{editingId ? "Edit Section" : "Create New Section"}</h4>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="flex gap-4 flex-wrap items-end">
-                  <div className="flex-1 min-w-[150px]">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+                  <div className="min-w-0 lg:col-span-1">
                     <label className="text-xs uppercase text-[var(--text-muted)]">Section Code</label>
                     <Input required value={form.sectionCode} onChange={e => setForm({...form, sectionCode: e.target.value})} placeholder="e.g. CS101-A" />
                   </div>
-                  <div className="w-[120px]">
+                  <div className="min-w-0">
                     <label className="text-xs uppercase text-[var(--text-muted)]">Term</label>
                     <select required className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm" value={form.term} onChange={e => setForm({...form, term: e.target.value})}>
                       <option value="fall">Fall</option>
@@ -349,18 +350,18 @@ export function SectionsTab() {
                       <option value="winter">Winter</option>
                     </select>
                   </div>
-                  <div className="w-[100px]">
+                  <div className="min-w-0">
                     <label className="text-xs uppercase text-[var(--text-muted)]">Year</label>
                     <Input type="number" required value={form.year} onChange={e => setForm({...form, year: Number(e.target.value)})} />
                   </div>
-                  <div className="flex-1 min-w-[200px]">
+                  <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                     <label className="text-xs uppercase text-[var(--text-muted)]">Course</label>
                     <select required className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm" value={form.course} onChange={e => setForm({...form, course: e.target.value})}>
                       <option value="" disabled>Select course...</option>
                       {courses.map(c => <option key={c._id || c.id} value={c._id || c.id}>{c.code} - {c.name}</option>)}
                     </select>
                   </div>
-                  <div className="w-[100px]">
+                  <div className="min-w-0">
                     <label className="text-xs uppercase text-[var(--text-muted)]">Capacity</label>
                     <Input type="number" required value={form.capacity} onChange={e => setForm({...form, capacity: Number(e.target.value)})} />
                   </div>
@@ -368,14 +369,14 @@ export function SectionsTab() {
 
                 {/* Student Selection */}
                 <div className="border-t border-[var(--border-subtle)] pt-4">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <label className="text-xs uppercase text-[var(--text-muted)]">
                       Students ({selectedStudents.length}/{form.capacity})
                     </label>
                     <div className="relative">
                       <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                       <Input 
-                        className="pl-8 w-64" 
+                        className="w-full pl-8 sm:w-64" 
                         placeholder="Search students..." 
                         value={studentSearch}
                         onChange={e => {
@@ -386,7 +387,7 @@ export function SectionsTab() {
                     </div>
                   </div>
                   
-                  <div className="flex gap-4">
+                  <div className="grid gap-4 lg:grid-cols-[1fr_16rem]">
                     {/* Available Students */}
                     <div className="flex-1 border border-[var(--border-subtle)] rounded-lg max-h-48 overflow-y-auto">
                       <div className="p-2 bg-[var(--bg-elevated)] text-xs text-[var(--text-muted)] uppercase border-b border-[var(--border-subtle)]">
@@ -430,7 +431,7 @@ export function SectionsTab() {
                     </div>
 
                     {/* Selected Students */}
-                    <div className="w-64 border border-[var(--border-subtle)] rounded-lg max-h-48 overflow-y-auto">
+                    <div className="border border-[var(--border-subtle)] rounded-lg max-h-48 overflow-y-auto">
                       <div className="p-2 bg-[var(--bg-elevated)] text-xs text-[var(--text-muted)] uppercase border-b border-[var(--border-subtle)]">
                         Selected ({selectedStudents.length})
                       </div>
@@ -472,54 +473,88 @@ export function SectionsTab() {
           )}
 
           {/* Sections Table */}
-          <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-            <table className="min-w-full text-left text-sm border-collapse">
-              <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Code</th>
-                  <th className="px-4 py-3 font-medium">Term/Year</th>
-                  <th className="px-4 py-3 font-medium">Course</th>
-                  <th className="px-4 py-3 font-medium">Enrolled/Capacity</th>
-                  <th className="px-4 py-3 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sections.length === 0 && (
-                  <tr><td colSpan={5} className="text-center p-4 text-[var(--text-muted)]">No sections found.</td></tr>
-                )}
-                {sections.map(sec => (
-                  <tr key={sec._id} className="border-b border-[var(--border-subtle)]">
-                    <td className="px-4 py-3 font-medium">{sec.sectionCode}</td>
-                    <td className="px-4 py-3 capitalize">{sec.term} {sec.year}</td>
-                    <td className="px-4 py-3">{sec.course?.name || "Unknown Course"}</td>
-                    <td className="px-4 py-3">
-                      <span className={`${(sec.enrolledCount || 0) >= sec.capacity ? 'text-[var(--accent-danger)]' : ''}`}>
-                        {sec.enrolledCount || 0}/{sec.capacity}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 flex justify-end gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => openStudentModal(sec._id)} title="Manage Students">
-                        <Users className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleEditSection(sec)} title="Edit Section">
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(sec._id)} className="text-[var(--accent-danger)]" title="Delete Section">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </td>
+          <ResponsiveTable
+            items={sections}
+            getKey={(sec) => sec._id}
+            empty={<Card className="p-6 text-center text-sm text-[var(--text-muted)]">No sections found.</Card>}
+            table={
+              <table className="min-w-full text-left text-sm border-collapse">
+                <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
+                  <tr>
+                    <th className="px-4 py-3 font-medium">Code</th>
+                    <th className="px-4 py-3 font-medium">Term/Year</th>
+                    <th className="px-4 py-3 font-medium">Course</th>
+                    <th className="px-4 py-3 font-medium">Enrolled/Capacity</th>
+                    <th className="px-4 py-3 font-medium text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {sections.map(sec => (
+                    <tr key={sec._id} className="border-b border-[var(--border-subtle)]">
+                      <td className="px-4 py-3 font-medium">{sec.sectionCode}</td>
+                      <td className="px-4 py-3 capitalize">{sec.term} {sec.year}</td>
+                      <td className="px-4 py-3">{sec.course?.name || "Unknown Course"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`${(sec.enrolledCount || 0) >= sec.capacity ? 'text-[var(--accent-danger)]' : ''}`}>
+                          {sec.enrolledCount || 0}/{sec.capacity}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => openStudentModal(sec._id)} title="Manage Students">
+                            <Users className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEditSection(sec)} title="Edit Section">
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDelete(sec._id)} className="text-[var(--accent-danger)]" title="Delete Section">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            renderCard={(sec) => (
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-[var(--text-primary)]">{sec.sectionCode}</p>
+                    <p className="truncate text-sm text-[var(--text-muted)]">{sec.course?.name || "Unknown Course"}</p>
+                  </div>
+                  <span className="rounded-full bg-[var(--bg-elevated)] px-3 py-1 text-xs capitalize text-[var(--text-muted)]">
+                    {sec.term} {sec.year}
+                  </span>
+                </div>
+                <div className="mt-3 text-sm">
+                  <span className={`${(sec.enrolledCount || 0) >= sec.capacity ? 'text-[var(--accent-danger)]' : 'text-[var(--text-primary)]'}`}>
+                    {sec.enrolledCount || 0}/{sec.capacity}
+                  </span>
+                  <span className="text-[var(--text-muted)]"> students enrolled</span>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  <Button variant="ghost" size="sm" className="h-10" onClick={() => openStudentModal(sec._id)} title="Manage Students">
+                    <Users className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-10" onClick={() => handleEditSection(sec)} title="Edit Section">
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="h-10 text-[var(--accent-danger)]" onClick={() => handleDelete(sec._id)} title="Delete Section">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          />
         </div>
       </DataState>
 
       {/* Student Management Modal */}
       {isStudentModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col m-4">
+        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 sm:items-center">
+          <Card className="m-0 flex h-[100dvh] w-full max-w-2xl flex-col overflow-hidden rounded-none sm:m-4 sm:h-auto sm:max-h-[80vh] sm:rounded-2xl">
             <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
               <h3 className="font-medium text-lg">Manage Students</h3>
               <Button variant="ghost" size="sm" onClick={() => closeSectionWorkspace()}>
@@ -528,7 +563,7 @@ export function SectionsTab() {
             </div>
             
             <div className="p-4 border-b border-[var(--border-subtle)]">
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--text-muted)]" />
                   <Input 
@@ -541,7 +576,7 @@ export function SectionsTab() {
                     }}
                   />
                 </div>
-                <div className="text-sm text-[var(--text-muted)]">
+                <div className="text-sm text-[var(--text-muted)] sm:text-right">
                   {enrolledStudents.length}/{modalCapacity} enrolled
                 </div>
               </div>

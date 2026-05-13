@@ -90,9 +90,9 @@ export function IntelligenceBrief() {
 
   if (loading) {
     return (
-      <div className="flex gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible">
+      <div className="grid gap-4 md:grid-cols-3">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="nc-skeleton h-36 min-w-[260px] shrink-0 rounded-[8px] md:min-w-0" />
+          <div key={i} className="nc-skeleton h-36 rounded-[8px]" />
         ))}
       </div>
     );
@@ -105,8 +105,8 @@ export function IntelligenceBrief() {
   const freeHours = freeToday.reduce((a, x) => a + x.duration / 60, 0);
 
   return (
-    <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible">
-      <Card className="min-w-[260px] snap-center p-4 md:min-w-0">
+    <div className="grid gap-4 md:grid-cols-3">
+      <Card className="p-4">
         <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Next class</p>
         {next ? (
           <>
@@ -124,7 +124,7 @@ export function IntelligenceBrief() {
         )}
       </Card>
 
-      <Card className="min-w-[260px] snap-center p-4 md:min-w-0">
+      <Card className="p-4">
         <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Free time today</p>
         <p className="mt-2 font-[family-name:var(--font-fraunces)] text-3xl font-semibold text-[var(--accent-secondary)]">
           {freeHours.toFixed(1)}h
@@ -136,7 +136,7 @@ export function IntelligenceBrief() {
         </div>
       </Card>
 
-      <Card className="min-w-[260px] snap-center p-4 md:min-w-0">
+      <Card className="p-4">
         <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Goal momentum</p>
         <div className="mt-2 flex items-center gap-4">
           <div

@@ -36,11 +36,35 @@
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
+html {
+  width: 100%;
+  max-width: 100%;
+}
+
 body {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-dm-sans), ui-sans-serif, system-ui, sans-serif;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+button,
+[role="button"],
+select,
+input[type="checkbox"],
+input[type="radio"] {
+  touch-action: manipulation;
 }
 
 /* Page enter motion */

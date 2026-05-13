@@ -85,6 +85,7 @@ export function TimetableTab() {
   // Form for adding a slot
   const [activeSlot, setActiveSlot] = useState<{day: string, time: string} | null>(null);
   const [slotForm, setSlotForm] = useState({ subject: "", teacher: "", room: "" });
+  const [mobileDay, setMobileDay] = useState(DAYS[0]);
 
   function writeTimetableUrl(section: Section | null, mode?: "edit" | "new") {
     const params = new URLSearchParams(searchParams.toString());
@@ -340,7 +341,7 @@ export function TimetableTab() {
             className="gap-2"
             disabled={saveStatus === "saving"}
           >
-            {saveStatus === "saving" && <span className="animate-spin">⏳</span>}
+            {saveStatus === "saving" && <span className="animate-spin">...</span>}
             {saveStatus === "saved" && <Check className="h-4 w-4" />}
             {saveStatus === "error" && <X className="h-4 w-4" />}
             {saveStatus === "idle" && <CalendarIcon className="h-4 w-4" />}
@@ -383,7 +384,7 @@ export function TimetableTab() {
                           {s.course?.name || s.course?.title || "Unknown Course"}
                         </div>
                         <div className="text-xs text-[var(--text-muted)]">
-                          {s.sectionCode} · {s.term} {s.year}
+                          {s.sectionCode} - {s.term} {s.year}
                         </div>
                       </button>
                     ))}
@@ -417,7 +418,7 @@ export function TimetableTab() {
                           {s.course?.name || s.course?.title || "Unknown Course"}
                         </div>
                         <div className="text-xs text-[var(--text-muted)]">
-                          {s.sectionCode} · {s.term} {s.year} · {s.enrolledCount || 0} students
+                          {s.sectionCode} - {s.term} {s.year} - {s.enrolledCount || 0} students
                         </div>
                       </button>
                     ))}
@@ -430,7 +431,7 @@ export function TimetableTab() {
           {/* Selected Section Info */}
           {sectionId && selectedSection && (
             <Card className={`p-4 ${hasExistingTimetable ? 'border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5' : 'border-green-500/30 bg-green-500/5'}`}>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">
                     {hasExistingTimetable ? "Editing Existing Timetable" : "Creating New Timetable"}
@@ -442,7 +443,7 @@ export function TimetableTab() {
                     {selectedSection.term?.charAt(0).toUpperCase()}{selectedSection.term?.slice(1)} {selectedSection.year}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="sm:text-right">
                   <p className="text-sm text-[var(--text-muted)]">
                     {timetable?.slots?.length || 0} slots configured
                   </p>
@@ -473,16 +474,16 @@ export function TimetableTab() {
               <h4 className="font-medium text-[var(--text-primary)] mb-4">
                 Assign Slot: {activeSlot.day.charAt(0).toUpperCase() + activeSlot.day.slice(1)} at {activeSlot.time}
               </h4>
-              <form onSubmit={handleAddSlot} className="flex gap-4 items-end flex-wrap">
-                <div className="flex-1 min-w-[200px]">
+              <form onSubmit={handleAddSlot} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1.4fr_auto_auto] lg:items-end">
+                <div className="min-w-0">
                   <label className="text-xs uppercase text-[var(--text-muted)]">Subject</label>
                   <Input required value={slotForm.subject} onChange={(e) => setSlotForm({...slotForm, subject: e.target.value})} placeholder="e.g. Data Structures" />
                 </div>
-                <div className="flex-1 min-w-[150px]">
+                <div className="min-w-0">
                   <label className="text-xs uppercase text-[var(--text-muted)]">Room</label>
                   <Input required value={slotForm.room} onChange={(e) => setSlotForm({...slotForm, room: e.target.value})} placeholder="e.g. Room 101" />
                 </div>
-                <div className="flex-1 min-w-[250px]">
+                <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                   <label className="text-xs uppercase text-[var(--text-muted)]">Teacher</label>
                   <select 
                     required 
@@ -504,60 +505,109 @@ export function TimetableTab() {
 
           {/* Timetable Grid */}
           {sectionId && timetable && (
-            <div className="overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
-              <table className="min-w-full text-left text-sm border-collapse">
-                <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
-                  <tr>
-                    <th className="px-4 py-3 font-medium border-r border-[var(--border-subtle)] w-24">Time</th>
-                    {DAYS.map(day => (
-                      <th key={day} className="px-4 py-3 font-medium capitalize text-center border-r border-[var(--border-subtle)]">{day}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {TIMES.map(time => (
-                    <tr key={time} className="border-b border-[var(--border-subtle)]">
-                      <td className="px-4 py-3 border-r border-[var(--border-subtle)] font-medium text-[var(--text-muted)] bg-[var(--bg-elevated)]">
-                        {time}
-                      </td>
-                      {DAYS.map(day => {
-                        const slot = getSlotAt(day, time);
-                        return (
-                          <td key={`${day}-${time}`} className="p-2 border-r border-[var(--border-subtle)] text-center relative group min-w-[150px]">
-                            {slot ? (
-                              <div className="bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 rounded-lg p-2">
-                                <span className="font-semibold text-[var(--text-primary)]">{slot.subject}</span>
-                                <div className="flex items-center justify-center gap-1 mt-1 text-xs text-[var(--text-muted)]">
-                                  <MapPin className="h-3 w-3" />
-                                  <span>{slot.room}</span>
-                                </div>
-                                <div className="flex items-center justify-center gap-1 text-xs text-[var(--text-muted)]">
-                                  <User className="h-3 w-3" />
-                                  <span>{getTeacherName(slot.teacher)}</span>
-                                </div>
-                                <button 
-                                  onClick={() => removeSlot(day, time)}
-                                  className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 text-[var(--accent-danger)] hover:bg-[var(--accent-danger)]/10 rounded transition-opacity"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ) : (
-                              <button 
-                                onClick={() => setActiveSlot({ day, time })}
-                                className="w-full h-16 flex flex-col items-center justify-center border-2 border-dashed border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-muted)] transition-all"
-                              >
-                                <Plus className="h-4 w-4" />
-                                <span className="text-xs mt-1">Add Slot</span>
-                              </button>
-                            )}
-                          </td>
-                        );
-                      })}
+            <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:hidden">
+                {DAYS.map(day => (
+                  <Button
+                    key={day}
+                    type="button"
+                    size="sm"
+                    variant={mobileDay === day ? "filled" : "ghost"}
+                    className="shrink-0 capitalize"
+                    onClick={() => setMobileDay(day)}
+                  >
+                    {day.slice(0, 3)}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="space-y-2 md:hidden">
+                {TIMES.map(time => {
+                  const slot = getSlotAt(mobileDay, time);
+                  return (
+                    <div key={`${mobileDay}-${time}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="font-medium text-[var(--text-primary)]">{time}</span>
+                        <span className="text-xs capitalize text-[var(--text-muted)]">{mobileDay}</span>
+                      </div>
+                      {slot ? (
+                        <div className="rounded-lg border border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/10 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-[var(--text-primary)]">{slot.subject}</p>
+                              <p className="mt-1 text-xs text-[var(--text-muted)]">{getTeacherName(slot.teacher)}</p>
+                              <p className="text-xs text-[var(--text-muted)]">{slot.room}</p>
+                            </div>
+                            <Button variant="ghost" size="sm" className="h-9 w-9 p-0 text-[var(--accent-danger)]" onClick={() => removeSlot(mobileDay, time)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Button type="button" variant="ghost" className="h-12 w-full border border-dashed border-[var(--border-subtle)]" onClick={() => setActiveSlot({ day: mobileDay, time })}>
+                          <Plus className="mr-2 h-4 w-4" /> Add Slot
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="hidden overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] md:block">
+                <table className="min-w-full text-left text-sm border-collapse">
+                  <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
+                    <tr>
+                      <th className="px-4 py-3 font-medium border-r border-[var(--border-subtle)] w-24">Time</th>
+                      {DAYS.map(day => (
+                        <th key={day} className="px-4 py-3 font-medium capitalize text-center border-r border-[var(--border-subtle)]">{day}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {TIMES.map(time => (
+                      <tr key={time} className="border-b border-[var(--border-subtle)]">
+                        <td className="px-4 py-3 border-r border-[var(--border-subtle)] font-medium text-[var(--text-muted)] bg-[var(--bg-elevated)]">
+                          {time}
+                        </td>
+                        {DAYS.map(day => {
+                          const slot = getSlotAt(day, time);
+                          return (
+                            <td key={`${day}-${time}`} className="p-2 border-r border-[var(--border-subtle)] text-center relative group min-w-[150px]">
+                              {slot ? (
+                                <div className="bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/30 rounded-lg p-2">
+                                  <span className="font-semibold text-[var(--text-primary)]">{slot.subject}</span>
+                                  <div className="flex items-center justify-center gap-1 mt-1 text-xs text-[var(--text-muted)]">
+                                    <MapPin className="h-3 w-3" />
+                                    <span>{slot.room}</span>
+                                  </div>
+                                  <div className="flex items-center justify-center gap-1 text-xs text-[var(--text-muted)]">
+                                    <User className="h-3 w-3" />
+                                    <span>{getTeacherName(slot.teacher)}</span>
+                                  </div>
+                                  <button 
+                                    onClick={() => removeSlot(day, time)}
+                                    className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 p-1 text-[var(--accent-danger)] hover:bg-[var(--accent-danger)]/10 rounded transition-opacity"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button 
+                                  onClick={() => setActiveSlot({ day, time })}
+                                  className="w-full h-16 flex flex-col items-center justify-center border-2 border-dashed border-transparent hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] rounded-lg text-[var(--text-muted)] transition-all"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  <span className="text-xs mt-1">Add Slot</span>
+                                </button>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 

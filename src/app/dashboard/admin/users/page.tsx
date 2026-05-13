@@ -15,7 +15,7 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <main className="mx-auto min-h-full max-w-[1600px] px-4 py-6 md:px-6 lg:px-8">
+    <main className="mx-auto max-w-[1600px] px-4 py-6 md:px-6 lg:px-8">
       <UsersTab />
     </main>
   );

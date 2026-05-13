@@ -136,6 +136,43 @@ function WeekGrid({ slots }: { slots: ScheduleSlot[] }) {
   );
 }
 
+function WeekList({ slots }: { slots: ScheduleSlot[] }) {
+  const byDay = (day: string) =>
+    slots
+      .filter((s) => s.day === day)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+  const hasAnySlot = WEEK_DAYS.some((d) => byDay(d).length > 0);
+
+  if (!hasAnySlot) {
+    return <p className="py-6 text-center text-sm text-[var(--text-muted)]">No slots assigned for this section.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {WEEK_DAYS.map((day) => {
+        const daySlots = byDay(day);
+        return (
+          <section key={day} className="space-y-2">
+            <p className="font-mono text-xs font-semibold uppercase tracking-wider text-[var(--text-primary)]">
+              {day}
+            </p>
+            {daySlots.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-sm text-[var(--text-muted)]">
+                Free day
+              </div>
+            ) : (
+              daySlots.map((slot, index) =>
+                slot.isFreePeriod ? <FreePeriodCell key={index} slot={slot} /> : <ClassCell key={index} slot={slot} />
+              )
+            )}
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Stats bar ────────────────────────────────────────────────────────────────
 
 function ScheduleStats({ slots }: { slots: ScheduleSlot[] }) {
@@ -197,17 +234,17 @@ export default function TeacherTimetablePage() {
 
   if (!allowed) {
     return (
-      <main className="p-6">
+      <main className="p-4 md:p-6">
         <div className="nc-skeleton h-10 w-48 rounded-[8px]" />
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+    <main className="mx-auto max-w-6xl px-3 py-4 md:px-6 md:py-6">
       {/* Page header */}
       <div className="mb-6">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">
+        <h1 className="font-[family-name:var(--font-fraunces)] text-2xl text-[var(--text-primary)] md:text-3xl">
           My Schedule
         </h1>
         <p className="mt-1 text-sm text-[var(--text-muted)]">
@@ -263,8 +300,13 @@ export default function TeacherTimetablePage() {
               </div>
 
               {/* Weekly grid */}
-              <div className="overflow-x-auto p-5">
-                <WeekGrid slots={schedule.slots} />
+              <div className="p-4 md:p-5">
+                <div className="md:hidden">
+                  <WeekList slots={schedule.slots} />
+                </div>
+                <div className="hidden overflow-x-auto md:block">
+                  <WeekGrid slots={schedule.slots} />
+                </div>
               </div>
             </Card>
           ))}

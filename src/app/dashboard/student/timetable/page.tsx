@@ -74,7 +74,7 @@ export default function StudentTimetablePage() {
   }, [allowed]);
 
   if (!allowed) {
-    return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
+    return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
   }
 
   const slots = timetableData?.slots ?? [];
@@ -95,9 +95,9 @@ export default function StudentTimetablePage() {
   };
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+    <main className="mx-auto max-w-6xl px-3 py-4 md:px-6 md:py-6">
       <div className="mb-6">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">My Timetable</h1>
+        <h1 className="font-[family-name:var(--font-fraunces)] text-2xl text-[var(--text-primary)] md:text-3xl">My Timetable</h1>
         <p className="text-sm text-[var(--text-muted)]">
           {timetableData?.sectionInfo 
             ? `${timetableData.sectionInfo.course?.name || 'Course'} - Section ${timetableData.sectionInfo.sectionCode}`
@@ -118,7 +118,7 @@ export default function StudentTimetablePage() {
       )}
 
       {!loading && !error && (
-        <Card className="p-6">
+        <Card className="p-4 md:p-6">
           <div className="grid gap-4 md:grid-cols-5">
             {WEEK_DAYS.map((day) => (
               <div key={day} className="flex flex-col gap-3">

@@ -13,8 +13,8 @@ export function TimetableBuilderStub() {
     <Card className="p-4">
       <p className="font-[family-name:var(--font-fraunces)] text-lg text-[var(--text-primary)]">Timetable planner</p>
       <p className="mt-1 text-xs text-[var(--text-muted)]">Select a slot to review placement and quickly identify collisions before publishing.</p>
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[520px] border-collapse text-left">
+      <div className="mt-4 hidden md:block">
+        <table className="w-full border-collapse text-left">
           <thead>
             <tr>
               <th className="p-2 font-mono text-[10px] uppercase text-[var(--text-muted)]" />
@@ -49,6 +49,30 @@ export function TimetableBuilderStub() {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="mt-4 grid gap-3 md:hidden">
+        {DAYS.map((day) => (
+          <div key={day} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3">
+            <p className="font-mono text-[10px] uppercase text-[var(--text-muted)]">{day}</p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {HOURS.map((hour) => {
+                const id = `${day}-${hour}`;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className={`rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-3 text-center text-[10px] text-[var(--text-muted)] hover:border-[var(--accent-primary)] ${
+                      collision === id ? "border-[var(--accent-danger)] bg-[var(--accent-danger)]/15" : ""
+                    }`}
+                    onClick={() => setCollision(id)}
+                  >
+                    {hour}:00
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </Card>
   );

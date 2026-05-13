@@ -109,14 +109,14 @@ export default function StudentTakeAssessmentPage() {
   }, [payload, answers]);
 
   if (!allowed) {
-    return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
+    return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
   }
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = String(timeLeft % 60).padStart(2, "0");
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 px-4 py-6 md:px-6">
+    <main className="mx-auto max-w-4xl space-y-6 px-3 py-4 pb-24 md:px-6 md:py-6">
       {error && <p className="text-sm text-[var(--accent-danger)]">{error}</p>}
       {!payload ? (
         <Card className="p-8 text-center text-[var(--text-muted)]">Loading test...</Card>
@@ -124,10 +124,10 @@ export default function StudentTakeAssessmentPage() {
         <>
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">{payload.assessment.title}</h1>
-              <p className="text-sm text-[var(--text-muted)]">{payload.assessment.type.toUpperCase()} · {payload.assessment.durationMinutes} minutes</p>
+              <h1 className="font-[family-name:var(--font-fraunces)] text-2xl text-[var(--text-primary)] md:text-3xl">{payload.assessment.title}</h1>
+              <p className="text-sm text-[var(--text-muted)]">{payload.assessment.type.toUpperCase()} - {payload.assessment.durationMinutes} minutes</p>
             </div>
-            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2 font-mono text-lg text-[var(--accent-danger)]">
+            <div className="sticky top-14 z-20 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-2 font-mono text-lg text-[var(--accent-danger)] md:static">
               {minutes}:{seconds}
             </div>
           </header>
@@ -135,14 +135,14 @@ export default function StudentTakeAssessmentPage() {
           {payload.assessment.type === "mcq" ? (
             <div className="space-y-4">
               {payload.assessment.questions.map((question, questionIndex) => (
-                <Card key={questionIndex} className="p-5">
-                  <div className="mb-4 flex items-start justify-between gap-4">
+                <Card key={questionIndex} className="p-4 md:p-5">
+                  <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <h2 className="font-medium text-[var(--text-primary)]">Q{questionIndex + 1}. {question.prompt}</h2>
                     <span className="text-xs text-[var(--text-muted)]">{question.marks ?? 1} marks</span>
                   </div>
                   <div className="space-y-2">
                     {(question.options ?? []).map((option, optionIndex) => (
-                      <label key={optionIndex} className="flex cursor-pointer items-center gap-3 rounded-lg border border-[var(--border-subtle)] p-3 hover:bg-[var(--bg-elevated)]">
+                      <label key={optionIndex} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border border-[var(--border-subtle)] p-3 hover:bg-[var(--bg-elevated)]">
                         <input
                           type="radio"
                           name={`question-${questionIndex}`}
@@ -159,8 +159,8 @@ export default function StudentTakeAssessmentPage() {
           ) : (
             <div className="space-y-4">
               {payload.assessment.fileUrl && (
-                <Card className="p-5">
-                  <div className="mb-3 flex items-center justify-between">
+                <Card className="p-4 md:p-5">
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <h2 className="font-medium text-[var(--text-primary)]">Question Paper Attachment</h2>
                     <a href={payload.assessment.fileUrl} target="_blank" rel="noreferrer" className="text-sm text-[var(--accent-primary)] hover:underline">
                       {payload.assessment.fileUrl.startsWith("data:application/pdf") ? "Open PDF" : "Open full paper"}
@@ -176,13 +176,13 @@ export default function StudentTakeAssessmentPage() {
                 </Card>
               )}
               {(payload.assessment.questions.length > 0 ? payload.assessment.questions : [{ prompt: "Write your answer for the attached question paper.", marks: 0 }]).map((question, questionIndex) => (
-                <Card key={questionIndex} className="p-5">
-                  <div className="mb-4 flex items-start justify-between gap-4">
+                <Card key={questionIndex} className="p-4 md:p-5">
+                  <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <h2 className="font-medium text-[var(--text-primary)]">Q{questionIndex + 1}. {question.prompt}</h2>
                     {Number(question.marks ?? 0) > 0 && <span className="text-xs text-[var(--text-muted)]">{question.marks} marks</span>}
                   </div>
                   <textarea
-                    className="min-h-[180px] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm"
+                    className="min-h-[220px] w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm md:min-h-[180px]"
                     value={writtenAnswers[questionIndex] ?? ""}
                     onChange={event => setWrittenAnswers(current => ({ ...current, [questionIndex]: event.target.value }))}
                     placeholder="Write your answer here..."
@@ -192,8 +192,8 @@ export default function StudentTakeAssessmentPage() {
             </div>
           )}
 
-          <div className="flex justify-end">
-            <Button onClick={submit} disabled={submitting} variant="filled">
+          <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 md:static md:border-0 md:bg-transparent md:p-0 md:text-right">
+            <Button onClick={submit} disabled={submitting} variant="filled" className="w-full md:w-auto">
               {submitting ? "Submitting..." : "Submit Test"}
             </Button>
           </div>

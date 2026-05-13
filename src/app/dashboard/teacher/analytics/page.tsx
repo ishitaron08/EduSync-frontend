@@ -88,7 +88,7 @@ export default function TeacherAnalyticsPage() {
         </div>
         <div className="flex gap-4 items-center">
           <Select value={selectedTest} onValueChange={handleSelectTest}>
-            <SelectTrigger className="w-[250px]">
+            <SelectTrigger className="w-full sm:w-[250px]">
               <SelectValue placeholder="Select a test" />
             </SelectTrigger>
             <SelectContent>

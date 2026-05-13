@@ -97,7 +97,7 @@ export function AdminDashboard() {
   }, [setUrlTab]);
 
   return (
-    <main className="mx-auto min-h-full max-w-[1600px] px-4 py-6 md:px-6 lg:px-8">
+    <main className="mx-auto min-h-full max-w-[1600px] px-3 py-4 md:px-6 md:py-6 lg:px-8">
       <div className="space-y-6">
         <Card className="p-5 md:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -108,7 +108,7 @@ export function AdminDashboard() {
                 <Badge tone="blue">URL-synced tabs</Badge>
               </div>
               <div>
-                <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold tracking-tight text-[var(--text-primary)] md:text-5xl">
+                <h1 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-tight text-[var(--text-primary)] md:text-5xl">
                   Admin dashboard
                 </h1>
                 <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] md:text-base">
@@ -117,7 +117,7 @@ export function AdminDashboard() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid gap-2 sm:flex sm:flex-wrap">
               <Link href="/dashboard/admin?tab=users" className="inline-flex items-center justify-center rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
                 Manage users
               </Link>
@@ -129,7 +129,7 @@ export function AdminDashboard() {
         </Card>
 
         <Tabs value={optimisticTab} onValueChange={handleTabChange} className="space-y-6">
-          <TabsList variant="pills" className={isPending ? "pointer-events-none opacity-70" : ""}>
+          <TabsList variant="pills" className={`grid grid-cols-2 gap-2 sm:grid-cols-4 md:flex md:flex-wrap ${isPending ? "pointer-events-none opacity-70" : ""}`}>
             {tabs.map(({ value, label, icon: Icon }) => (
               <TabsTrigger key={value} value={value} variant="pills">
                 <Icon className="h-4 w-4" />

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check, Plus, Trash2 } from "lucide-react";
 
@@ -167,7 +168,7 @@ export default function TeacherTestsPage() {
   const writtenValid = Boolean(commonValid && rubric.trim() && writtenSourceValid);
 
   if (!allowed) {
-    return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
+    return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
   }
 
   function updateTestsUrl(next: { section?: string; type?: "mcq" | "written" | "history" }) {
@@ -314,9 +315,9 @@ export default function TeacherTestsPage() {
   );
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+    <main className="mx-auto max-w-6xl px-3 py-4 md:px-6 md:py-6">
       <div className="mb-6">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">Manage Tests</h1>
+        <h1 className="font-[family-name:var(--font-fraunces)] text-2xl text-[var(--text-primary)] md:text-3xl">Manage Tests</h1>
         <p className="text-sm text-[var(--text-muted)]">Create drafts, publish ready tests, and export results.</p>
       </div>
 
@@ -324,7 +325,7 @@ export default function TeacherTestsPage() {
       {success && <p className="mb-4 text-sm text-[var(--accent-primary)]">{success}</p>}
 
       <Tabs value={testTypeTab} onValueChange={handleTypeChange} className="space-y-6">
-        <TabsList>
+          <TabsList className="grid w-full grid-cols-3 gap-2">
           <TabsTrigger value="mcq">MCQ Test</TabsTrigger>
           <TabsTrigger value="written">Written Test</TabsTrigger>
           <TabsTrigger value="history">History</TabsTrigger>
@@ -333,7 +334,7 @@ export default function TeacherTestsPage() {
         {(["mcq", "written"] as const).map(type => (
           <TabsContent key={type} value={type}>
             <Card className="p-0">
-              <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 px-6 py-5">
+              <div className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)]/60 px-4 py-4 md:px-6 md:py-5">
                 <h2 className="text-lg font-semibold text-[var(--text-primary)]">{type === "mcq" ? "Create MCQ Draft" : "Create Written Draft"}</h2>
                 <p className="mt-1 text-sm text-[var(--text-muted)]">
                   {type === "mcq"
@@ -342,7 +343,7 @@ export default function TeacherTestsPage() {
                 </p>
               </div>
 
-              <div className="grid gap-4 p-6 md:grid-cols-2">
+              <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6">
                 <div>
                   <label className="text-xs uppercase text-[var(--text-muted)]">Test Title</label>
                   <Input className="mt-1" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Midterm Quiz" />
@@ -370,7 +371,7 @@ export default function TeacherTestsPage() {
               </div>
 
               {type === "mcq" ? (
-                <div className="space-y-4 px-6 pb-6">
+                <div className="space-y-4 px-4 pb-4 md:px-6 md:pb-6">
                   {questions.map((question, questionIndex) => (
                     <Card key={questionIndex} className="p-4">
                       <div className="mb-3 flex items-center justify-between">
@@ -383,7 +384,7 @@ export default function TeacherTestsPage() {
                       <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto]">
                         <div className="space-y-2">
                           {question.options.map((option, optionIndex) => (
-                            <div key={optionIndex} className="flex items-center gap-2">
+                            <div key={optionIndex} className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
                               <Input value={option} onChange={e => updateOption(questionIndex, optionIndex, e.target.value)} placeholder={`Option ${optionIndex + 1}`} />
                               <Button
                                 type="button"
@@ -407,7 +408,7 @@ export default function TeacherTestsPage() {
                         </div>
                         <div>
                           <label className="text-xs uppercase text-[var(--text-muted)]">Marks</label>
-                          <Input className="mt-1 w-24" type="number" min="1" value={question.marks} onChange={e => updateQuestion(questionIndex, { marks: Number(e.target.value) })} />
+                          <Input className="mt-1 w-full sm:w-24" type="number" min="1" value={question.marks} onChange={e => updateQuestion(questionIndex, { marks: Number(e.target.value) })} />
                         </div>
                       </div>
                       {!questionIsValid(question) && <p className="mt-2 text-xs text-[var(--accent-danger)]">Fill the prompt, at least two non-empty options, mark one filled option as correct, and set marks.</p>}
@@ -418,7 +419,7 @@ export default function TeacherTestsPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="grid gap-5 px-6 pb-6">
+                <div className="grid gap-5 px-4 pb-4 md:px-6 md:pb-6">
                   <div>
                     <p className="mb-3 text-xs uppercase text-[var(--text-muted)]">Question Source</p>
                     <div className="grid gap-3 md:grid-cols-3">
@@ -476,7 +477,7 @@ export default function TeacherTestsPage() {
                             <div>
                               <label className="text-xs uppercase text-[var(--text-muted)]">Marks</label>
                               <Input
-                                className="mt-1 w-24"
+                                className="mt-1 w-full sm:w-24"
                                 type="number"
                                 min="1"
                                 value={question.marks}
@@ -526,7 +527,7 @@ export default function TeacherTestsPage() {
                 </div>
               )}
 
-              <div className="border-t border-[var(--border-subtle)] px-6 py-5">
+              <div className="border-t border-[var(--border-subtle)] px-4 py-4 md:px-6 md:py-5">
                 <Button onClick={() => handleCreateTest(type)} disabled={saving || (type === "mcq" ? !mcqValid : !writtenValid)} variant="filled">
                   {saving ? "Creating..." : "Create Test (Draft)"}
                 </Button>
@@ -536,49 +537,78 @@ export default function TeacherTestsPage() {
         ))}
 
         <TabsContent value="history">
-          <Card className="overflow-hidden">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-muted)]">
-                <tr>
-                  <th className="px-4 py-3">Title</th>
-                  <th className="px-4 py-3">Type</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Window</th>
-                  <th className="px-4 py-3">Questions</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--border-subtle)]">
-                {sortedAssessments.map(assessment => (
-                  <tr key={assessment._id}>
-                    <td className="px-4 py-3 font-medium">{assessment.title}</td>
-                    <td className="px-4 py-3">{assessment.type.toUpperCase()}</td>
-                    <td className="px-4 py-3"><Badge tone={assessment.status === "published" ? "green" : assessment.status === "draft" ? "blue" : "muted"}>{assessment.status}</Badge></td>
-                    <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{new Date(assessment.startTime).toLocaleString()} - {new Date(assessment.endTime).toLocaleString()}</td>
-                    <td className="px-4 py-3">{assessment.questions?.length ?? 0}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        {assessment.status === "draft" ? (
-                          <>
-                            <Button size="sm" variant="filled" onClick={() => publishAssessment(assessment._id)}>Publish</Button>
-                            <Button size="sm" variant="ghost" onClick={() => deleteAssessment(assessment._id)}>Delete</Button>
-                          </>
-                        ) : (
-                          <>
-                            <Button size="sm" variant="ghost" onClick={() => router.push(`/dashboard/teacher/analytics?test=${assessment._id}`)}>Analytics</Button>
-                            <Button size="sm" variant="ghost" onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api"}/teacher/assessments/${assessment._id}/export`, "_blank")}>Export CSV</Button>
-                          </>
-                        )}
-                      </div>
-                    </td>
+          <ResponsiveTable
+            items={sortedAssessments}
+            getKey={(assessment) => assessment._id}
+            empty={<Card className="p-6 text-center text-[var(--text-muted)]">No tests created yet.</Card>}
+            table={
+              <table className="min-w-full text-left text-sm">
+                <thead className="border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-[var(--text-muted)]">
+                  <tr>
+                    <th className="px-4 py-3">Title</th>
+                    <th className="px-4 py-3">Type</th>
+                    <th className="px-4 py-3">Status</th>
+                    <th className="px-4 py-3">Window</th>
+                    <th className="px-4 py-3">Questions</th>
+                    <th className="px-4 py-3">Actions</th>
                   </tr>
-                ))}
-                {sortedAssessments.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-[var(--text-muted)]">No tests created yet.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </Card>
+                </thead>
+                <tbody className="divide-y divide-[var(--border-subtle)]">
+                  {sortedAssessments.map(assessment => (
+                    <tr key={assessment._id}>
+                      <td className="px-4 py-3 font-medium">{assessment.title}</td>
+                      <td className="px-4 py-3">{assessment.type.toUpperCase()}</td>
+                      <td className="px-4 py-3"><Badge tone={assessment.status === "published" ? "green" : assessment.status === "draft" ? "blue" : "muted"}>{assessment.status}</Badge></td>
+                      <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{new Date(assessment.startTime).toLocaleString()} - {new Date(assessment.endTime).toLocaleString()}</td>
+                      <td className="px-4 py-3">{assessment.questions?.length ?? 0}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {assessment.status === "draft" ? (
+                            <>
+                              <Button size="sm" variant="filled" onClick={() => publishAssessment(assessment._id)}>Publish</Button>
+                              <Button size="sm" variant="ghost" onClick={() => deleteAssessment(assessment._id)}>Delete</Button>
+                            </>
+                          ) : (
+                            <>
+                              <Button size="sm" variant="ghost" onClick={() => router.push(`/dashboard/teacher/analytics?test=${assessment._id}`)}>Analytics</Button>
+                              <Button size="sm" variant="ghost" onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api"}/teacher/assessments/${assessment._id}/export`, "_blank")}>Export CSV</Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            }
+            renderCard={(assessment) => (
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-[var(--text-primary)]">{assessment.title}</p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">{assessment.type.toUpperCase()} - {assessment.questions?.length ?? 0} questions</p>
+                  </div>
+                  <Badge tone={assessment.status === "published" ? "green" : assessment.status === "draft" ? "blue" : "muted"}>{assessment.status}</Badge>
+                </div>
+                <p className="mt-3 text-xs text-[var(--text-muted)]">
+                  {new Date(assessment.startTime).toLocaleString()} - {new Date(assessment.endTime).toLocaleString()}
+                </p>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {assessment.status === "draft" ? (
+                    <>
+                      <Button size="sm" variant="filled" className="h-10" onClick={() => publishAssessment(assessment._id)}>Publish</Button>
+                      <Button size="sm" variant="ghost" className="h-10" onClick={() => deleteAssessment(assessment._id)}>Delete</Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button size="sm" variant="ghost" className="h-10" onClick={() => router.push(`/dashboard/teacher/analytics?test=${assessment._id}`)}>Analytics</Button>
+                      <Button size="sm" variant="ghost" className="h-10" onClick={() => window.open(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api"}/teacher/assessments/${assessment._id}/export`, "_blank")}>Export</Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+          />
         </TabsContent>
       </Tabs>
     </main>

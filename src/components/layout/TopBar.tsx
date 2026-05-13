@@ -36,7 +36,7 @@ export function TopBar({
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 px-4 backdrop-blur-sm md:px-6">
+    <header className="hidden h-14 shrink-0 items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 px-4 backdrop-blur-sm md:flex md:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <Button
           type="button"

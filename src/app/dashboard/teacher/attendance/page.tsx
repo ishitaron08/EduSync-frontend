@@ -42,6 +42,19 @@ type AttendanceRecord = AttendanceStudent & {
   timestamp?: string;
 };
 
+type AttendanceSession = {
+  _id: string;
+  mode: AttendanceMode;
+  status: "active" | "expired" | "closed";
+  expiresAt: string;
+};
+
+type LiveStatusResponse = {
+  session: AttendanceSession | null;
+  records?: AttendanceRecord[];
+  scannedStudents?: AttendanceRecord[];
+};
+
 const statusLabels: Record<AttendanceStatus, string> = {
   present: "Present",
   absent: "Absent",
@@ -56,7 +69,7 @@ function sectionLabel(section: TeacherSection) {
 function slotLabel(slot: AttendanceSlot) {
   const day = slot.day.charAt(0).toUpperCase() + slot.day.slice(1);
   const subject = slot.subject || slot.className || "Class";
-  return `${day} ${slot.startTime}-${slot.endTime} · ${subject}${slot.room ? ` · ${slot.room}` : ""}`;
+  return `${day} ${slot.startTime}-${slot.endTime} - ${subject}${slot.room ? ` - ${slot.room}` : ""}`;
 }
 
 export default function TeacherAttendancePage() {
@@ -68,6 +81,8 @@ export default function TeacherAttendancePage() {
   const [slotKey, setSlotKey] = useState("");
   const [mode, setMode] = useState<AttendanceMode>("qr");
   const [token, setToken] = useState<string | null>(null);
+  const [qrSessionId, setQrSessionId] = useState<string | null>(null);
+  const [activeSession, setActiveSession] = useState<AttendanceSession | null>(null);
   const [expiresAt, setExpiresAt] = useState<Date | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -112,18 +127,20 @@ export default function TeacherAttendancePage() {
     if (!sectionId || !slotKey) {
       setStudents([]);
       setRecords([]);
+      setActiveSession(null);
       return;
     }
 
     let alive = true;
     Promise.all([
       api.get(`/teacher/attendance/students?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}`),
-      api.get(`/teacher/attendance/live-status?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}&sessionDate=${new Date().toISOString()}`)
+      api.get<LiveStatusResponse>(`/teacher/attendance/live-status?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}&sessionDate=${new Date().toISOString()}`)
     ])
       .then(([studentsRes, recordsRes]) => {
         if (!alive) return;
         setStudents(studentsRes.data.students || []);
         setRecords(recordsRes.data.records || recordsRes.data.scannedStudents || []);
+        setActiveSession(recordsRes.data.session ?? null);
         setLoadErr(null);
       })
       .catch((e) => {
@@ -142,6 +159,7 @@ export default function TeacherAttendancePage() {
       setTimeLeft(remaining);
       if (remaining === 0) {
         setToken(null);
+        setQrSessionId(null);
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -152,8 +170,9 @@ export default function TeacherAttendancePage() {
     let alive = true;
     const poll = setInterval(async () => {
       try {
-        const { data } = await api.get(`/teacher/attendance/live-status?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}&sessionDate=${new Date().toISOString()}`);
+        const { data } = await api.get<LiveStatusResponse>(`/teacher/attendance/live-status?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}&sessionDate=${new Date().toISOString()}`);
         if (alive) setRecords(data.records || data.scannedStudents || []);
+        if (alive) setActiveSession(data.session ?? null);
       } catch (err) {
         console.error("Polling error", err);
       }
@@ -165,7 +184,7 @@ export default function TeacherAttendancePage() {
   }, [token, sectionId, slotKey]);
 
   if (!allowed) {
-    return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
+    return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
   }
 
   function updateAttendanceUrl(next: { section?: string; slot?: string; mode?: AttendanceMode }) {
@@ -185,12 +204,16 @@ export default function TeacherAttendancePage() {
     setSectionId(nextSectionId);
     setSlotKey(nextSlot);
     setToken(null);
+    setQrSessionId(null);
+    setActiveSession(null);
     updateAttendanceUrl({ section: nextSectionId, slot: nextSlot });
   }
 
   function handleSlotChange(nextSlotKey: string) {
     setSlotKey(nextSlotKey);
     setToken(null);
+    setQrSessionId(null);
+    setActiveSession(null);
     updateAttendanceUrl({ slot: nextSlotKey });
   }
 
@@ -201,6 +224,13 @@ export default function TeacherAttendancePage() {
         slotKey
       });
       setToken(data.token);
+      setQrSessionId(data.qrSessionId);
+      setActiveSession({
+        _id: data.qrSessionId,
+        mode: "qr",
+        status: "active",
+        expiresAt: data.expiresAt
+      });
       setExpiresAt(new Date(data.expiresAt));
       setLoadErr(null);
       setMessage("QR attendance session started.");
@@ -221,6 +251,9 @@ export default function TeacherAttendancePage() {
         subject: selectedSlot?.subject,
         status
       });
+      if (data.session) {
+        setActiveSession(data.session);
+      }
       setRecords((current) => {
         const withoutStudent = current.filter(record => record._id !== studentId);
         const student = students.find(entry => entry._id === studentId);
@@ -254,10 +287,10 @@ export default function TeacherAttendancePage() {
   const presentCount = records.filter(record => record.status === "present" || !record.status).length;
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+    <main className="mx-auto max-w-6xl px-3 py-4 md:px-6 md:py-6">
       <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">Class Attendance</h1>
+          <h1 className="font-[family-name:var(--font-fraunces)] text-2xl text-[var(--text-primary)] md:text-3xl">Class Attendance</h1>
           <p className="text-sm text-[var(--text-muted)]">Use QR scanning or mark students manually for your own timetable slots.</p>
         </div>
         <div className="inline-flex rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1">
@@ -273,7 +306,7 @@ export default function TeacherAttendancePage() {
       {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)]">{loadErr}</p>}
       {message && <p className="mb-4 text-sm text-[var(--accent-primary)]">{message}</p>}
 
-      <Card className="mb-6 p-6">
+      <Card className="mb-6 p-4 md:p-6">
         <div className="grid gap-4 md:grid-cols-2">
           <div>
             <label className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Section</label>
@@ -313,26 +346,27 @@ export default function TeacherAttendancePage() {
 
       {mode === "qr" ? (
         <div className="grid gap-8 lg:grid-cols-2">
-          <Card className="p-6">
+          <Card className="p-4 md:p-6">
             <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">QR Attendance</h2>
             {!token ? (
               <Button onClick={generateToken} disabled={!sectionId || !slotKey} className="w-full" variant="filled">
                 <QrCode className="mr-2 h-4 w-4" /> Generate 5-Minute QR Code
               </Button>
             ) : (
-              <Button onClick={() => setToken(null)} className="w-full" variant="outline">
+              <Button onClick={() => { setToken(null); setQrSessionId(null); }} className="w-full" variant="outline">
                 End Session Early
               </Button>
             )}
           </Card>
 
           {token ? (
-            <Card className="flex flex-col items-center justify-center border-[var(--accent-primary)] p-8 text-center">
+            <Card className="flex flex-col items-center justify-center border-[var(--accent-primary)] p-4 text-center md:p-8">
               <p className="mb-4 text-sm text-[var(--text-muted)]">Project this on screen for students to scan</p>
               <div className="mb-4 inline-block rounded-xl bg-white p-4 shadow-sm">
-                <QRCodeSVG value={token} size={250} />
+                <QRCodeSVG value={token} size={250} className="h-[min(62vw,250px)] w-[min(62vw,250px)]" />
               </div>
               <p className="font-mono text-2xl font-semibold text-[var(--accent-primary)]">{formatTime(timeLeft)}</p>
+              {qrSessionId && <p className="mt-1 text-xs font-mono text-[var(--text-muted)]">Session {qrSessionId.slice(-8)}</p>}
               <p className="mt-1 text-xs text-[var(--text-muted)]">Code expires automatically</p>
             </Card>
           ) : (
@@ -343,7 +377,7 @@ export default function TeacherAttendancePage() {
           )}
         </div>
       ) : (
-        <Card className="p-6">
+        <Card className="p-4 md:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-[var(--text-primary)]">Manual Attendance</h2>
             <span className="rounded-full bg-[var(--bg-elevated)] px-3 py-1 text-sm text-[var(--text-muted)]">
@@ -359,7 +393,7 @@ export default function TeacherAttendancePage() {
                     <p className="font-medium text-[var(--text-primary)]">{student.name}</p>
                     <p className="text-xs text-[var(--text-muted)]">{student.email || "No email"}</p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
                     {record?.status && (
                       <span className="inline-flex items-center rounded-full bg-[var(--bg-elevated)] px-3 py-1 text-xs text-[var(--text-primary)]">
                         <CheckCircle2 className="mr-1 h-3.5 w-3.5 text-[var(--accent-primary)]" />
@@ -389,21 +423,21 @@ export default function TeacherAttendancePage() {
       )}
 
       {(token || records.length > 0) && (
-        <Card className="mt-8 p-6">
+        <Card className="mt-8 p-4 md:p-6">
           <h2 className="mb-4 flex items-center justify-between text-lg font-semibold text-[var(--text-primary)]">
             <span>Today&apos;s Attendance</span>
             <span className="rounded-full bg-[var(--bg-elevated)] px-3 py-1 text-sm font-normal text-[var(--text-muted)]">
-              {presentCount} Present
+              {activeSession ? `${activeSession.mode.toUpperCase()} ${activeSession.status}` : `${presentCount} Present`}
             </span>
           </h2>
           <div className="space-y-3">
             {records.length > 0 ? (
               records.map((record) => (
-                <div key={record._id} className="flex items-center justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                <div key={record._id} className="flex flex-col gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="font-medium text-[var(--text-primary)]">{record.name}</span>
                   <span className="text-xs text-[var(--text-muted)]">
                     {record.status ? statusLabels[record.status] : "Present"}
-                    {record.timestamp ? ` · ${new Date(record.timestamp).toLocaleTimeString()}` : ""}
+                    {record.timestamp ? ` - ${new Date(record.timestamp).toLocaleTimeString()}` : ""}
                   </span>
                 </div>
               ))

@@ -94,6 +94,22 @@ export function CoursesTab() {
     }
   }
 
+  function renderCourseActions(course: CourseRow) {
+    return (
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="ghost" className="h-8 px-3 text-xs" disabled={savingId === course._id || course.moderationStatus === "approved"} onClick={() => updateStatus(course._id, "approved")}>
+          Approve
+        </Button>
+        <Button type="button" variant="ghost" className="h-8 px-3 text-xs" disabled={savingId === course._id || course.moderationStatus === "rejected"} onClick={() => updateStatus(course._id, "rejected")}>
+          Reject
+        </Button>
+        <Button type="button" variant="ghost" className="h-8 px-3 text-xs" disabled={savingId === course._id || course.moderationStatus === "pending"} onClick={() => updateStatus(course._id, "pending")}>
+          Pending
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <TabChrome
       eyebrow="Courses"
@@ -117,9 +133,9 @@ export function CoursesTab() {
             <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Courses</p>
             <p className="mt-1 text-sm text-[var(--text-muted)]">Real moderation data from the backend. Approve or reject inline.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code or name" className="w-64" />
-            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="h-10 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-primary)]">
+          <div className="grid w-full gap-2 sm:w-auto sm:grid-cols-[16rem_auto]">
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search code or name" className="w-full" />
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)} className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-primary)]">
               {STATUS_OPTIONS.map((option) => (
                 <option key={option} value={option}>
                   {option === "All statuses" ? "All statuses" : option.charAt(0).toUpperCase() + option.slice(1)}
@@ -129,7 +145,32 @@ export function CoursesTab() {
           </div>
         </div>
 
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--border-subtle)]">
+        <div className="mt-4 grid gap-3 md:hidden">
+          {filteredCourses.map((course) => (
+            <div key={course._id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="break-words font-medium text-[var(--text-primary)]">{course.code} - {course.name}</p>
+                  <p className="mt-1 break-words text-xs text-[var(--text-muted)]">{course.description || "No description provided."}</p>
+                </div>
+                <Badge tone={statusTone(course.moderationStatus)}>{course.moderationStatus}</Badge>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-[var(--text-muted)]">
+                <div>
+                  <p className="uppercase tracking-[0.08em]">Active</p>
+                  <p className="mt-1 text-sm text-[var(--text-primary)]">{course.isActive ? "Yes" : "No"}</p>
+                </div>
+                <div>
+                  <p className="uppercase tracking-[0.08em]">Created</p>
+                  <p className="mt-1 text-sm text-[var(--text-primary)]">{new Date(course.createdAt).toLocaleDateString()}</p>
+                </div>
+              </div>
+              <div className="mt-4">{renderCourseActions(course)}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 hidden rounded-2xl border border-[var(--border-subtle)] md:block">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)]">
               <tr>
@@ -153,17 +194,7 @@ export function CoursesTab() {
                   <td className="px-4 py-3 text-[var(--text-muted)]">{course.isActive ? "Yes" : "No"}</td>
                   <td className="px-4 py-3 text-[var(--text-muted)]">{new Date(course.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-2">
-                      <Button type="button" variant="ghost" className="h-8 px-3 text-xs" disabled={savingId === course._id || course.moderationStatus === "approved"} onClick={() => updateStatus(course._id, "approved")}>
-                        Approve
-                      </Button>
-                      <Button type="button" variant="ghost" className="h-8 px-3 text-xs" disabled={savingId === course._id || course.moderationStatus === "rejected"} onClick={() => updateStatus(course._id, "rejected")}>
-                        Reject
-                      </Button>
-                      <Button type="button" variant="ghost" className="h-8 px-3 text-xs" disabled={savingId === course._id || course.moderationStatus === "pending"} onClick={() => updateStatus(course._id, "pending")}>
-                        Pending
-                      </Button>
-                    </div>
+                    {renderCourseActions(course)}
                   </td>
                 </tr>
               ))}

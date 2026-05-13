@@ -27,7 +27,14 @@ type NavItem = { href: string; label: string; icon: typeof Home; roles?: Array<"
 
 const baseNav: NavItem[] = [{ href: "/", label: "Home", icon: Home }];
 
-export function AppSidebar({ expanded }: { expanded: boolean }) {
+type AppSidebarProps = {
+  expanded: boolean;
+  mobile?: boolean;
+  className?: string;
+  onNavigate?: () => void;
+};
+
+export function AppSidebar({ expanded, mobile = false, className, onNavigate }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const role = useAuthStore((s) => s.role);
@@ -75,8 +82,10 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
   return (
     <aside
       className={cn(
-        "sticky top-0 flex shrink-0 flex-col h-screen border-r border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 backdrop-blur-[12px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden",
-        expanded ? "w-[252px]" : "w-16"
+        "flex shrink-0 flex-col border-r border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 backdrop-blur-[12px] transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] overflow-hidden",
+        mobile ? "h-[100dvh] w-[280px] max-w-[86vw]" : "h-full",
+        !mobile && (expanded ? "w-[252px]" : "w-16"),
+        className
       )}
     >
       <div className="flex h-14 items-center justify-center border-b border-[var(--border-subtle)] px-3">
@@ -99,6 +108,7 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
               key={item.href}
               href={item.href}
               title={item.label}
+              onClick={onNavigate}
               className={cn(
                 "flex items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm text-[var(--text-muted)] transition-all duration-200 hover:border-[var(--border-subtle)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]",
                 active && "border-[var(--accent-primary)]/25 bg-[var(--accent-primary)]/8 text-[var(--text-primary)] shadow-[0_8px_18px_rgba(15,118,110,0.1)]"
@@ -116,7 +126,10 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
             <div className="absolute bottom-14 left-2 right-2 z-20 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1 shadow-lg">
               <Link
                 href="/profile"
-                onClick={() => setMenuOpen(false)}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onNavigate?.();
+                }}
                 className="block rounded px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
               >
                 Profile
@@ -124,7 +137,10 @@ export function AppSidebar({ expanded }: { expanded: boolean }) {
               {role === "admin" && (
                 <Link
                   href="/dashboard/admin/settings"
-                  onClick={() => setMenuOpen(false)}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onNavigate?.();
+                  }}
                   className="block rounded px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
                 >
                   System Settings
