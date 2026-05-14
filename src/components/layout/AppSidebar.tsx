@@ -60,6 +60,7 @@ export function AppSidebar({ expanded, mobile = false, className, onNavigate }: 
       { href: "/dashboard/student/timetable", label: "Timetable", icon: Calendar, roles: ["student"] },
       { href: "/dashboard/student/attendance", label: "Attendance", icon: ScanLine, roles: ["student"] },
       { href: "/dashboard/student/learning", label: "AI Learning", icon: Sparkles, roles: ["student"] },
+      { href: "/dashboard/student/syllabus-goals", label: "Syllabus Goals", icon: Target, roles: ["student"] },
       { href: "/dashboard/student/assessments", label: "Assessments", icon: ClipboardCheck, roles: ["student"] },
       { href: "/dashboard/student/leaderboard", label: "Leaderboard", icon: Trophy, roles: ["student"] },
       { href: "/dashboard/student/profile", label: "Profile", icon: Settings, roles: ["student"] }

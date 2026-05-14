@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
+import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { hueFromString } from "@/lib/hueFromString";
 import { Card } from "@/components/ui/card";
@@ -20,10 +22,26 @@ export default function StudentLeaderboardPage() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const [scope, setScope] = useState("all_time");
+  const leaderboardQuery = useQuery({
+    queryKey: queryKeys.student.leaderboard(scope),
+    queryFn: async () => {
+      const { data } = await api.get(`/student/leaderboard?scope=${scope}`);
+      return (data.rows || []) as LeaderboardEntry[];
+    },
+    enabled: allowed
+  });
+  const profileQuery = useQuery({
+    queryKey: queryKeys.student.profile,
+    queryFn: async () => {
+      const { data } = await api.get("/student/profile");
+      return data;
+    },
+    enabled: allowed
+  });
+  const leaderboard = leaderboardQuery.data ?? [];
+  const profile = profileQuery.data ?? null;
+  const loading = leaderboardQuery.isLoading || profileQuery.isLoading;
 
   useEffect(() => {
     const urlScope = searchParams.get("scope");
@@ -31,22 +49,6 @@ export default function StudentLeaderboardPage() {
       setScope(urlScope);
     }
   }, [searchParams]);
-
-  useEffect(() => {
-    if (!allowed) return;
-    
-    Promise.all([
-      api.get(`/student/leaderboard?scope=${scope}`),
-      api.get("/student/profile")
-    ])
-    .then(([lbRes, profRes]) => {
-      setLeaderboard(lbRes.data.rows || []);
-      setProfile(profRes.data);
-    })
-    .catch(console.error)
-    .finally(() => setLoading(false));
-
-  }, [allowed, scope]);
 
   if (!allowed) {
     return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { AppShell } from "@/components/AppShell";
 import { NoiseOverlay } from "@/components/NoiseOverlay";
+import { QueryProvider } from "@/lib/query-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -19,8 +20,10 @@ export default function RootLayout({
       className="h-full overflow-hidden antialiased"
     >
       <body className="flex h-full flex-col overflow-hidden" suppressHydrationWarning>
-        <NoiseOverlay />
-        <AppShell>{children}</AppShell>
+        <QueryProvider>
+          <NoiseOverlay />
+          <AppShell>{children}</AppShell>
+        </QueryProvider>
       </body>
     </html>
   );

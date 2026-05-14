@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { hueFromString } from "@/lib/hueFromString";
@@ -12,15 +13,16 @@ type LeaderboardEntry = { _id: string; name: string; totalPoints: number };
 
 export default function TeacherLeaderboardPage() {
   const allowed = useDashboardGuard("teacher");
-  const [leaders, setLeaders] = useState<LeaderboardEntry[]>([]);
-  const [loadErr, setLoadErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!allowed) return;
-    api.get<{ leaderboard: LeaderboardEntry[] }>("/teacher/leaderboard")
-      .then((res) => setLeaders(res.data.leaderboard || []))
-      .catch((e) => setLoadErr(describeApiError(e)));
-  }, [allowed]);
+  const leadersQuery = useQuery({
+    queryKey: queryKeys.teacher.leaderboard,
+    queryFn: async () => {
+      const { data } = await api.get<{ leaderboard: LeaderboardEntry[] }>("/teacher/leaderboard");
+      return data.leaderboard || [];
+    },
+    enabled: allowed
+  });
+  const leaders = leadersQuery.data ?? [];
+  const loadErr = leadersQuery.error ? describeApiError(leadersQuery.error) : null;
 
   if (!allowed) return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
 

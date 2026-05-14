@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { hueFromString } from "@/lib/hueFromString";
@@ -14,22 +15,16 @@ type PerfStudent = { _id: string; name: string; email: string; rewardPoints?: nu
 
 export default function TeacherDashboardPage() {
   const allowed = useDashboardGuard("teacher");
-  const [perf, setPerf] = useState<PerfStudent[]>([]);
-  const [loadErr, setLoadErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!allowed) return;
-    let c = false;
-    api.get<PerfStudent[]>("/teacher/performance")
-      .then((p) => {
-        if (c) return;
-        setPerf(Array.isArray(p.data) ? p.data : []);
-      })
-      .catch((e) => {
-        if (!c) setLoadErr(describeApiError(e));
-      });
-    return () => { c = true; };
-  }, [allowed]);
+  const perfQuery = useQuery({
+    queryKey: queryKeys.teacher.performance,
+    queryFn: async () => {
+      const { data } = await api.get<PerfStudent[]>("/teacher/performance");
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: allowed
+  });
+  const perf = perfQuery.data ?? [];
+  const loadErr = perfQuery.error ? describeApiError(perfQuery.error) : null;
 
   if (!allowed) {
     return (

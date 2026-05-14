@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TabChrome, AdminEmptyState } from "../TabChrome";
 import { DataState } from "../DataState";
 import { Card } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { Download } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
@@ -18,31 +19,16 @@ type AttendanceStats = {
 };
 
 export function AttendanceTab() {
-  const [stats, setStats] = useState<AttendanceStats | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    async function loadStats() {
-      try {
-        const { data } = await api.get<AttendanceStats>("/admin/attendance/stats");
-        if (alive) {
-          setStats(data);
-          setStatus("ready");
-        }
-      } catch (err) {
-        if (alive) {
-          setError(describeApiError(err));
-          setStatus("error");
-        }
-      }
+  const statsQuery = useQuery({
+    queryKey: queryKeys.admin.attendanceStats,
+    queryFn: async () => {
+      const { data } = await api.get<AttendanceStats>("/admin/attendance/stats");
+      return data;
     }
-    loadStats();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  });
+  const stats = statsQuery.data ?? null;
+  const status = statsQuery.isLoading ? "loading" : statsQuery.isError ? "error" : "ready";
+  const error = statsQuery.error ? describeApiError(statsQuery.error) : null;
 
   function handleExport() {
     if (!stats) return;

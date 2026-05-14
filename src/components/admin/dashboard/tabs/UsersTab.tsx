@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PencilLine, RefreshCcw, Search, Trash2, UserPlus } from "lucide-react";
 import { useAdminDashboardFilters } from "../hooks/useAdminDashboardFilters";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -55,46 +57,75 @@ function roleTone(role: AdminUserRow["role"]) {
 }
 
 export function UsersTab() {
-  const [users, setUsers] = useState<AdminUserRow[]>([]);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const { search, setSearch, roleFilter, setRoleFilter } = useAdminDashboardFilters();
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<UserFormState>(EMPTY_FORM);
   const [bulkFile, setBulkFile] = useState<File | null>(null);
-  const [bulkUploading, setBulkUploading] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-
-    async function loadUsers() {
-      setStatus("loading");
-      setError(null);
-      try {
-        const { data } = await api.get<UserListResponse>(`/admin/users?page=${page}&limit=${limit}`);
-        if (!alive) return;
-        setUsers(Array.isArray(data?.users) ? data.users : []);
-        setTotal(Number(data?.total ?? 0));
-        setStatus("ready");
-      } catch (loadError) {
-        if (!alive) return;
-        setUsers([]);
-        setTotal(0);
-        setError(describeApiError(loadError));
-        setStatus("error");
-      }
+  const [localError, setLocalError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const usersQuery = useQuery({
+    queryKey: queryKeys.admin.users(page, limit),
+    queryFn: async () => {
+      const { data } = await api.get<UserListResponse>(`/admin/users?page=${page}&limit=${limit}`);
+      return {
+        users: Array.isArray(data?.users) ? data.users : [],
+        total: Number(data?.total ?? 0)
+      };
     }
-
-    loadUsers();
-    return () => {
-      alive = false;
-    };
-  }, [limit, page]);
+  });
+  const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+  const saveUserMutation = useMutation({
+    mutationFn: async () => {
+      if (editingId) {
+        return api.put(`/admin/users/${editingId}`, {
+          name: form.name.trim(),
+          role: form.role,
+          rewardPoints: Number(form.rewardPoints || 0)
+        });
+      }
+      return api.post("/admin/users", {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        password: form.password,
+        role: form.role
+      });
+    },
+    onSuccess: async () => {
+      resetForm();
+      await invalidateUsers();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.metrics });
+    },
+    onError: (submitError) => setLocalError(describeApiError(submitError))
+  });
+  const deleteUserMutation = useMutation({
+    mutationFn: (userId: string) => api.delete(`/admin/users/${userId}`),
+    onSuccess: async (_data, userId) => {
+      if (editingId === userId) resetForm();
+      await invalidateUsers();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.metrics });
+    },
+    onError: (deleteError) => setLocalError(describeApiError(deleteError))
+  });
+  const bulkUploadMutation = useMutation({
+    mutationFn: async (usersToCreate: Array<{ name: string; email: string; role: string; password: string }>) =>
+      api.post("/admin/users/bulk", { users: usersToCreate }),
+    onSuccess: async (_data, usersToCreate) => {
+      setBulkFile(null);
+      await invalidateUsers();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.metrics });
+      alert(`Successfully uploaded ${usersToCreate.length} users.`);
+    },
+    onError: (err) => setLocalError(describeApiError(err))
+  });
+  const users = usersQuery.data?.users ?? [];
+  const total = usersQuery.data?.total ?? 0;
+  const status = usersQuery.isLoading ? "loading" : usersQuery.isError ? "error" : "ready";
+  const error = localError ?? (usersQuery.error ? describeApiError(usersQuery.error) : null);
+  const saving = saveUserMutation.isPending;
+  const deletingId = deleteUserMutation.variables ?? null;
+  const bulkUploading = bulkUploadMutation.isPending;
 
   const filteredUsers = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -125,66 +156,22 @@ export function UsersTab() {
 
   async function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSaving(true);
-    setError(null);
-
-    try {
-      if (editingId) {
-        await api.put(`/admin/users/${editingId}`, {
-          name: form.name.trim(),
-          role: form.role,
-          rewardPoints: Number(form.rewardPoints || 0)
-        });
-      } else {
-        await api.post("/admin/users", {
-          name: form.name.trim(),
-          email: form.email.trim(),
-          password: form.password,
-          role: form.role
-        });
-      }
-
-      resetForm();
-      const { data } = await api.get<UserListResponse>(`/admin/users?page=${page}&limit=${limit}`);
-      setUsers(Array.isArray(data?.users) ? data.users : []);
-      setTotal(Number(data?.total ?? 0));
-      setStatus("ready");
-    } catch (submitError) {
-      setError(describeApiError(submitError));
-      setStatus("error");
-    } finally {
-      setSaving(false);
-    }
+    setLocalError(null);
+    saveUserMutation.mutate();
   }
 
   async function removeUser(userId: string) {
     const confirmed = window.confirm("Delete this user from the admin panel?");
     if (!confirmed) return;
 
-    setDeletingId(userId);
-    setError(null);
-    try {
-      await api.delete(`/admin/users/${userId}`);
-      const { data } = await api.get<UserListResponse>(`/admin/users?page=${page}&limit=${limit}`);
-      setUsers(Array.isArray(data?.users) ? data.users : []);
-      setTotal(Number(data?.total ?? 0));
-      setStatus("ready");
-      if (editingId === userId) {
-        resetForm();
-      }
-    } catch (deleteError) {
-      setError(describeApiError(deleteError));
-      setStatus("error");
-    } finally {
-      setDeletingId(null);
-    }
+    setLocalError(null);
+    deleteUserMutation.mutate(userId);
   }
 
   async function handleBulkUpload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!bulkFile) return;
-    setBulkUploading(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       const text = await bulkFile.text();
@@ -194,18 +181,9 @@ export function UsersTab() {
         return { name, email, role: role || "student", password: Math.random().toString(36).slice(-8) };
       });
 
-      await api.post("/admin/users/bulk", { users: usersToCreate });
-      setBulkFile(null);
-      const { data } = await api.get<UserListResponse>(`/admin/users?page=${page}&limit=${limit}`);
-      setUsers(Array.isArray(data?.users) ? data.users : []);
-      setTotal(Number(data?.total ?? 0));
-      setStatus("ready");
-      alert(`Successfully uploaded ${usersToCreate.length} users.`);
+      bulkUploadMutation.mutate(usersToCreate);
     } catch (err) {
-      setError(describeApiError(err));
-      setStatus("error");
-    } finally {
-      setBulkUploading(false);
+      setLocalError(describeApiError(err));
     }
   }
 
@@ -220,19 +198,7 @@ export function UsersTab() {
             type="button"
             variant="ghost"
             className="gap-2"
-            onClick={() =>
-              void api
-                .get<UserListResponse>(`/admin/users?page=${page}&limit=${limit}`)
-                .then(({ data }) => {
-                  setUsers(Array.isArray(data?.users) ? data.users : []);
-                  setTotal(Number(data?.total ?? 0));
-                  setStatus("ready");
-                })
-                .catch((refreshError) => {
-                  setError(describeApiError(refreshError));
-                  setStatus("error");
-                })
-            }
+            onClick={() => void usersQuery.refetch()}
           >
             <RefreshCcw className="h-4 w-4" /> Refresh
           </Button>

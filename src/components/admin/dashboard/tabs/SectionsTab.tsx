@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TabChrome } from "../TabChrome";
 import { DataState } from "../DataState";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { ResponsiveTable } from "@/components/ui/responsive-table";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { Plus, Trash2, Edit2, Users, X, Search, UserPlus } from "lucide-react";
 
 
@@ -39,11 +41,8 @@ export function SectionsTab() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [sections, setSections] = useState<Section[]>([]);
-  const [courses, setCourses] = useState<Course[]>([]);
-  
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const [localError, setLocalError] = useState<string | null>(null);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -62,6 +61,33 @@ export function SectionsTab() {
   
   const defaultForm = { sectionCode: "", term: "fall", year: new Date().getFullYear(), capacity: 60, course: "" };
   const [form, setForm] = useState(defaultForm);
+  const sectionManagementQuery = useQuery({
+    queryKey: ["admin", "section-management"],
+    queryFn: async () => {
+      const [secRes, cRes] = await Promise.all([
+        api.get<Section[]>("/admin/sections"),
+        api.get("/admin/courses?limit=100")
+      ]);
+      return {
+        sections: Array.isArray(secRes.data) ? secRes.data : [],
+        courses: (cRes.data.courses || cRes.data.data || []) as Course[]
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: false
+  });
+  const sections = sectionManagementQuery.data?.sections ?? [];
+  const courses = sectionManagementQuery.data?.courses ?? [];
+  const status = sectionManagementQuery.isLoading ? "loading" : sectionManagementQuery.isError ? "error" : "ready";
+  const error = localError ?? (sectionManagementQuery.error ? describeApiError(sectionManagementQuery.error) : null);
+
+  function invalidateSectionManagement() {
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["admin", "section-management"] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.sections }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.timetableLists })
+    ]);
+  }
 
   function writeSectionUrl(action: "new" | "edit" | "manage" | null, sectionId?: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -95,22 +121,6 @@ export function SectionsTab() {
     if (pushUrl) writeSectionUrl(null);
   }
 
-  async function loadData() {
-    try {
-      setStatus("loading");
-      const [secRes, cRes] = await Promise.all([
-        api.get("/admin/sections"),
-        api.get("/admin/courses?limit=100")
-      ]);
-      setSections(secRes.data);
-      setCourses(cRes.data.courses || cRes.data.data || []);
-      setStatus("ready");
-    } catch (err) {
-      setError(describeApiError(err));
-      setStatus("error");
-    }
-  }
-
   async function loadStudents(search: string = "") {
     try {
       setLoadingStudents(true);
@@ -134,10 +144,6 @@ export function SectionsTab() {
       console.error("Failed to load enrolled students:", describeApiError(err));
     }
   }
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   useEffect(() => {
     if (isFormOpen) {
@@ -201,7 +207,7 @@ export function SectionsTab() {
         await api.post("/admin/sections", payload);
       }
       closeSectionWorkspace();
-      loadData();
+      await invalidateSectionManagement();
     } catch (err) {
       alert("Failed to save section: " + describeApiError(err));
     }
@@ -211,7 +217,7 @@ export function SectionsTab() {
     if (!confirm("Are you sure you want to delete this section? This will also remove all student enrollments.")) return;
     try {
       await api.delete(`/admin/sections/${id}`);
-      loadData();
+      await invalidateSectionManagement();
     } catch (err) {
       alert("Failed to delete: " + describeApiError(err));
     }
@@ -222,6 +228,7 @@ export function SectionsTab() {
     try {
       await api.post(`/admin/sections/${editingSectionId}/students`, { studentIds: [studentId] });
       loadEnrolledStudents(editingSectionId);
+      await invalidateSectionManagement();
     } catch (err) {
       alert("Failed to add student: " + describeApiError(err));
     }
@@ -232,6 +239,7 @@ export function SectionsTab() {
     try {
       await api.delete(`/admin/sections/${editingSectionId}/students/${studentId}`);
       loadEnrolledStudents(editingSectionId);
+      await invalidateSectionManagement();
     } catch (err) {
       alert("Failed to remove student: " + describeApiError(err));
     }

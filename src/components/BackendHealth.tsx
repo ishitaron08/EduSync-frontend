@@ -1,34 +1,26 @@
 "use client";
 
 import { ReloadIcon } from "@radix-ui/react-icons";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getBackendOrigin } from "@/lib/backendOrigin";
+import { queryKeys } from "@/lib/queryKeys";
 
 type Status = "checking" | "ok" | "error";
 
 export function BackendHealth() {
   const healthUrl = `${getBackendOrigin()}/health`;
-  const [status, setStatus] = useState<Status>("checking");
-  const [detail, setDetail] = useState<string>(healthUrl);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    fetch(healthUrl)
-      .then(async (res) => {
-        if (!res.ok) {
-          setStatus("error");
-          setDetail(`${healthUrl} (HTTP ${res.status})`);
-          return;
-        }
-        const body = await res.json().catch(() => ({}));
-        setStatus("ok");
-        setDetail(`${healthUrl} | ${JSON.stringify(body)}`);
-      })
-      .catch((err: Error) => {
-        setStatus("error");
-        setDetail(`${healthUrl} | ${err.message}`);
-      });
-  }, [attempt, healthUrl]);
+  const healthQuery = useQuery({
+    queryKey: queryKeys.health.backend,
+    queryFn: async () => {
+      const res = await fetch(healthUrl);
+      if (!res.ok) return { status: "error" as Status, detail: `${healthUrl} (HTTP ${res.status})` };
+      const body = await res.json().catch(() => ({}));
+      return { status: "ok" as Status, detail: `${healthUrl} | ${JSON.stringify(body)}` };
+    },
+    retry: false
+  });
+  const status: Status = healthQuery.isLoading ? "checking" : healthQuery.isError ? "error" : healthQuery.data?.status ?? "checking";
+  const detail = healthQuery.isError ? `${healthUrl} | ${(healthQuery.error as Error).message}` : healthQuery.data?.detail ?? healthUrl;
 
   return (
     <article className="rounded-[2.5rem] border border-zinc-800 bg-zinc-950/65 p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.3)]">
@@ -36,10 +28,7 @@ export function BackendHealth() {
         <p className="text-sm font-medium text-zinc-200">Backend health</p>
         <button
           type="button"
-          onClick={() => {
-            setStatus("checking");
-            setAttempt((value) => value + 1);
-          }}
+          onClick={() => healthQuery.refetch()}
           className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-700 px-2 py-1 text-xs text-zinc-300 transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:border-zinc-600 hover:text-zinc-100 active:-translate-y-[1px] active:scale-[0.98]"
         >
           <ReloadIcon className="h-3.5 w-3.5" />

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,15 +24,16 @@ type StudentProgress = {
 
 export default function TeacherStudentsPage() {
   const allowed = useDashboardGuard("teacher");
-  const [students, setStudents] = useState<StudentProgress[]>([]);
-  const [loadErr, setLoadErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!allowed) return;
-    api.get<StudentProgress[]>("/teacher/students/progress")
-      .then((res) => setStudents(Array.isArray(res.data) ? res.data : []))
-      .catch((e) => setLoadErr(describeApiError(e)));
-  }, [allowed]);
+  const studentsQuery = useQuery({
+    queryKey: queryKeys.teacher.studentsProgress,
+    queryFn: async () => {
+      const { data } = await api.get<StudentProgress[]>("/teacher/students/progress");
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: allowed
+  });
+  const students = studentsQuery.data ?? [];
+  const loadErr = studentsQuery.error ? describeApiError(studentsQuery.error) : null;
 
   if (!allowed) return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
 

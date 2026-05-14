@@ -1,32 +1,39 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ScanLine, Sparkles, ClipboardCheck, Flame, Calendar as CalendarIcon, TrendingUp } from "lucide-react";
 import api from "@/lib/api";
+import { queryKeys } from "@/lib/queryKeys";
 
 export default function StudentDashboardPage() {
   const allowed = useDashboardGuard("student");
-  const [profile, setProfile] = useState<any>(null);
-  const [attendanceStats, setAttendanceStats] = useState<{ percentage: number; present: number; total: number } | null>(null);
-
-  useEffect(() => {
-    if (!allowed) return;
-    api.get("/student/profile").then(res => setProfile(res.data)).catch(console.error);
-    api.get("/student/attendance/stats")
-      .then(res => {
-        const { overall } = res.data;
-        setAttendanceStats({
-          percentage: overall.percentage,
-          present: overall.present,
-          total: overall.totalRecorded
-        });
-      })
-      .catch(() => {});
-  }, [allowed]);
+  const profileQuery = useQuery({
+    queryKey: queryKeys.student.profile,
+    queryFn: async () => {
+      const { data } = await api.get("/student/profile");
+      return data;
+    },
+    enabled: allowed
+  });
+  const attendanceStatsQuery = useQuery({
+    queryKey: queryKeys.student.attendanceStats,
+    queryFn: async () => {
+      const { data } = await api.get("/student/attendance/stats");
+      const { overall } = data;
+      return {
+        percentage: overall.percentage,
+        present: overall.present,
+        total: overall.totalRecorded
+      };
+    },
+    enabled: allowed
+  });
+  const profile = profileQuery.data ?? null;
+  const attendanceStats = attendanceStatsQuery.data ?? null;
 
   if (!allowed) {
     return (

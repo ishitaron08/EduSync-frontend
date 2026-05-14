@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TabChrome } from "../TabChrome";
 import { DataState } from "../DataState";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { Plus, Trash2, Calendar as CalendarIcon, Edit2, FileText, Check, X, User, MapPin, AlertCircle } from "lucide-react";
 
 type Slot = {
@@ -86,15 +88,12 @@ export function TimetableTab() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [sections, setSections] = useState<Section[]>([]);
-  const [teachers, setTeachers] = useState<Teacher[]>([]);
-  const [masterTimetables, setMasterTimetables] = useState<MasterTimetableInfo[]>([]);
+  const queryClient = useQueryClient();
 
   const [sectionId, setSectionId] = useState("");
   const [sectionTerm, setSectionTerm] = useState("fall");
   const [sectionYear, setSectionYear] = useState(new Date().getFullYear());
   const [timetable, setTimetable] = useState<Timetable | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("ready");
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   
@@ -105,6 +104,65 @@ export function TimetableTab() {
   const [activeSlot, setActiveSlot] = useState<{day: string, time: string} | null>(null);
   const [slotForm, setSlotForm] = useState({ subject: "", teacher: "", room: "" });
   const [mobileDay, setMobileDay] = useState(DAYS[0]);
+  const timetableSetupQuery = useQuery({
+    queryKey: ["admin", "timetable", "setup"],
+    queryFn: async () => {
+      const [teachersRes, sectionsRes, timetablesRes] = await Promise.all([
+        api.get("/admin/users?role=teacher&limit=100"),
+        api.get<Section[]>("/admin/sections"),
+        api.get<MasterTimetableInfo[]>("/admin/timetable/master/list")
+      ]);
+      const fetchedTeachers = teachersRes.data.users || teachersRes.data.data || teachersRes.data;
+      return {
+        teachers: Array.isArray(fetchedTeachers) ? fetchedTeachers as Teacher[] : [],
+        sections: Array.isArray(sectionsRes.data) ? sectionsRes.data : [],
+        masterTimetables: Array.isArray(timetablesRes.data) ? timetablesRes.data : []
+      };
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: false
+  });
+  const sections = timetableSetupQuery.data?.sections ?? [];
+  const teachers = timetableSetupQuery.data?.teachers ?? [];
+  const masterTimetables = timetableSetupQuery.data?.masterTimetables ?? [];
+  const masterTimetableQuery = useQuery({
+    queryKey: queryKeys.admin.timetable(sectionId, sectionTerm, sectionYear),
+    queryFn: async () => {
+      try {
+        const { data } = await api.get<Timetable>(`/admin/timetable/master?sectionId=${sectionId}&term=${sectionTerm}&year=${sectionYear}`);
+        if (!data || !data.slots || data.slots.length === 0) {
+          return {
+            timetable: { sectionId, section: sectionId, term: sectionTerm, year: sectionYear, slots: [] },
+            hasExisting: false
+          };
+        }
+        return {
+          timetable: { ...data, sectionId: data.sectionId ?? sectionId },
+          hasExisting: true
+        };
+      } catch (err: unknown) {
+        const statusCode = (err as { response?: { status?: number } })?.response?.status;
+        if (statusCode === 404) {
+          return {
+            timetable: { sectionId, section: sectionId, term: sectionTerm, year: sectionYear, slots: [] },
+            hasExisting: false
+          };
+        }
+        throw err;
+      }
+    },
+    enabled: Boolean(sectionId),
+    staleTime: 5 * 60 * 1000,
+    refetchOnMount: false,
+    retry: false
+  });
+  const displayStatus: "loading" | "ready" | "error" =
+    timetableSetupQuery.isLoading || (Boolean(sectionId) && masterTimetableQuery.isLoading)
+      ? "loading"
+      : timetableSetupQuery.isError || masterTimetableQuery.isError
+        ? "error"
+        : "ready";
+  const displayError = error ?? (timetableSetupQuery.error || masterTimetableQuery.error ? describeApiError(timetableSetupQuery.error ?? masterTimetableQuery.error) : null);
 
   function writeTimetableUrl(section: Section | null, mode?: "edit" | "new") {
     const params = new URLSearchParams(searchParams.toString());
@@ -146,38 +204,6 @@ export function TimetableTab() {
     writeTimetableUrl(null);
   }
 
-  // Load initial data
-  useEffect(() => {
-    let alive = true;
-    async function loadInitialData() {
-      try {
-        const [teachersRes, sectionsRes, timetablesRes] = await Promise.all([
-          api.get("/admin/users?role=teacher&limit=100"),
-          api.get("/admin/sections"),
-          api.get("/admin/timetable/master/list")
-        ]);
-        if (alive) {
-          const fetchedTeachers = teachersRes.data.users || teachersRes.data.data || teachersRes.data;
-          setTeachers(Array.isArray(fetchedTeachers) ? fetchedTeachers : []);
-          
-          const fetchedSections = sectionsRes.data;
-          setSections(Array.isArray(fetchedSections) ? fetchedSections : []);
-          
-          const fetchedTimetables = timetablesRes.data;
-          setMasterTimetables(Array.isArray(fetchedTimetables) ? fetchedTimetables : []);
-          
-          setStatus("ready");
-        }
-      } catch(e) {
-        console.error("Failed to fetch initial data", e);
-        setError("Failed to load initial data");
-        setStatus("error");
-      }
-    }
-    loadInitialData();
-    return () => { alive = false; };
-  }, []);
-
   // sectionId is always a plain string in the updated MasterTimetableInfo type.
   // The section object is also available as a fallback for older cached data.
   const getTimetableSectionId = (entry: MasterTimetableInfo): string => {
@@ -212,53 +238,22 @@ export function TimetableTab() {
     setSectionYear(Number(searchParams.get("year") || section.year || new Date().getFullYear()));
   }, [searchParams, sections, sectionId]);
 
-  // Load timetable when section is selected
   useEffect(() => {
     if (!sectionId) return;
-    
-    let alive = true;
-    async function loadMasterTimetable() {
-      setStatus("loading");
+    if (masterTimetableQuery.data) {
+      setTimetable(masterTimetableQuery.data.timetable);
+      setHasExistingTimetable(masterTimetableQuery.data.hasExisting);
       setError(null);
-      try {
-        const { data } = await api.get<Timetable>(`/admin/timetable/master?sectionId=${sectionId}&term=${sectionTerm}&year=${sectionYear}`);
-        if (alive) {
-          if (!data || !data.slots || data.slots.length === 0) {
-            setTimetable({ sectionId, section: sectionId, term: sectionTerm, year: sectionYear, slots: [] });
-            setHasExistingTimetable(false);
-          } else {
-            // Normalise: backend now sends both `section` (ObjectId) and
-            // `sectionId` (string). Ensure our local state always has sectionId.
-            setTimetable({ ...data, sectionId: data.sectionId ?? sectionId });
-            setHasExistingTimetable(true);
-          }
-          setStatus("ready");
-        }
-      } catch (err: any) {
-        if (alive) {
-          if (err?.response?.status === 404) {
-            setTimetable({ sectionId, section: sectionId, term: sectionTerm, year: sectionYear, slots: [] });
-            setHasExistingTimetable(false);
-            setStatus("ready");
-          } else {
-            setError(describeApiError(err));
-            setStatus("error");
-          }
-        }
-      }
     }
-    loadMasterTimetable();
-    return () => { alive = false; };
-  }, [sectionId, sectionTerm, sectionYear]);
+  }, [masterTimetableQuery.data, sectionId]);
 
   // Refresh master timetables list
   const refreshMasterTimetables = async () => {
-    try {
-      const res = await api.get("/admin/timetable/master/list");
-      setMasterTimetables(Array.isArray(res.data) ? res.data : []);
-    } catch (e) {
-      console.error("Failed to refresh timetables list", e);
-    }
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["admin", "timetable", "setup"] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.timetableLists }),
+      queryClient.invalidateQueries({ queryKey: ["admin", "section-management"] })
+    ]);
   };
 
   async function handleSaveTimetable() {
@@ -279,6 +274,7 @@ export function TimetableTab() {
       setSaveStatus("saved");
       setHasExistingTimetable(true);
       await refreshMasterTimetables();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.timetable(sectionId, sectionTerm, sectionYear) });
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (err) {
       setSaveStatus("error");
@@ -372,7 +368,7 @@ export function TimetableTab() {
         )
       }
     >
-      <DataState status={status} error={error} loading="Loading schedule...">
+      <DataState status={displayStatus} error={displayError} loading="Loading schedule...">
         <div className="space-y-6">
           {/* Section Selection - Two Options */}
           <Card className="p-4">

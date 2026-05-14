@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { Card } from "@/components/ui/card";
@@ -41,38 +42,27 @@ function Countdown({ target }: { target: Date }) {
 }
 
 export function IntelligenceBrief() {
-  const [slots, setSlots] = useState<Slot[]>([]);
-  const [freeToday, setFreeToday] = useState<{ duration: number }[]>([]);
-  const [goals, setGoals] = useState<Array<{ progress?: number }>>([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    let c = false;
-    Promise.all([
-      api.get<{ slots?: Slot[] }>("/student/timetable").catch(() => ({ data: { slots: [] as Slot[] } })),
-      api.get<Array<{ day: string; duration: number }>>("/student/free-slots").catch(() => ({ data: [] })),
-      api.get<Array<{ progress?: number }>>("/student/goals").catch(() => ({ data: [] }))
-    ])
-      .then(([tt, fs, gs]) => {
-        if (c) return;
-        setSlots(tt.data.slots ?? []);
-        const today = new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
-        const free = (fs.data as { day: string; duration: number }[])?.filter((x) => x.day === today) ?? [];
-        setFreeToday(free);
-        setGoals(gs.data ?? []);
-        setErr(null);
-      })
-      .catch((e) => {
-        if (!c) setErr(describeApiError(e));
-      })
-      .finally(() => {
-        if (!c) setLoading(false);
-      });
-    return () => {
-      c = true;
-    };
-  }, []);
+  const briefQuery = useQuery({
+    queryKey: ["student", "intelligence-brief"],
+    queryFn: async () => {
+      const [tt, fs, gs] = await Promise.all([
+        api.get<{ slots?: Slot[] }>("/student/timetable").catch(() => ({ data: { slots: [] as Slot[] } })),
+        api.get<Array<{ day: string; duration: number }>>("/student/free-slots").catch(() => ({ data: [] })),
+        api.get<Array<{ progress?: number }>>("/student/goals").catch(() => ({ data: [] }))
+      ]);
+      const today = new Date().toLocaleDateString("en-US", { weekday: "long" }).toLowerCase();
+      return {
+        slots: tt.data.slots ?? [],
+        freeToday: (fs.data as { day: string; duration: number }[])?.filter((x) => x.day === today) ?? [],
+        goals: gs.data ?? []
+      };
+    }
+  });
+  const slots = briefQuery.data?.slots ?? [];
+  const freeToday = briefQuery.data?.freeToday ?? [];
+  const goals = briefQuery.data?.goals ?? [];
+  const loading = briefQuery.isLoading;
+  const err = briefQuery.error ? describeApiError(briefQuery.error) : null;
 
   const next = useMemo(() => nextSlot(slots), [slots]);
   const nextStart = useMemo(() => {

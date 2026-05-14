@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { DataState } from "../DataState";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -20,33 +21,16 @@ type AssessmentRow = {
 };
 
 export function AssessmentsTab() {
-  const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    async function loadAssessments() {
-      setStatus("loading");
-      setError(null);
-      try {
-        const { data } = await api.get<AssessmentRow[]>("/admin/assessments");
-        if (!alive) return;
-        setAssessments(Array.isArray(data) ? data : []);
-        setStatus("ready");
-      } catch (loadError) {
-        if (!alive) return;
-        setAssessments([]);
-        setError(describeApiError(loadError));
-        setStatus("error");
-      }
+  const assessmentsQuery = useQuery({
+    queryKey: queryKeys.admin.assessments,
+    queryFn: async () => {
+      const { data } = await api.get<AssessmentRow[]>("/admin/assessments");
+      return Array.isArray(data) ? data : [];
     }
-
-    loadAssessments();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  });
+  const assessments = assessmentsQuery.data ?? [];
+  const status = assessmentsQuery.isLoading ? "loading" : assessmentsQuery.isError ? "error" : "ready";
+  const error = assessmentsQuery.error ? describeApiError(assessmentsQuery.error) : null;
 
   return (
     <TabChrome

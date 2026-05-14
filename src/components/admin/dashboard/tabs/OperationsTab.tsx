@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp, Clock3, User, Shield } from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { SystemHealth } from "@/components/admin/SystemHealth";
 import { DataState } from "../DataState";
 import { Badge } from "@/components/ui/badge";
@@ -194,33 +196,16 @@ function ActionDetails({ log }: { log: AuditLogRow }) {
 }
 
 export function OperationsTab() {
-  const [logs, setLogs] = useState<AuditLogRow[]>([]);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    async function loadLogs() {
-      setStatus("loading");
-      setError(null);
-      try {
-        const { data } = await api.get<{ logs?: AuditLogRow[] }>("/admin/audit-logs?limit=50");
-        if (!alive) return;
-        setLogs(Array.isArray(data?.logs) ? data.logs : []);
-        setStatus("ready");
-      } catch (loadError) {
-        if (!alive) return;
-        setLogs([]);
-        setError(describeApiError(loadError));
-        setStatus("error");
-      }
+  const logsQuery = useQuery({
+    queryKey: queryKeys.admin.auditLogs,
+    queryFn: async () => {
+      const { data } = await api.get<{ logs?: AuditLogRow[] }>("/admin/audit-logs?limit=50");
+      return Array.isArray(data?.logs) ? data.logs : [];
     }
-
-    loadLogs();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  });
+  const logs = logsQuery.data ?? [];
+  const status = logsQuery.isLoading ? "loading" : logsQuery.isError ? "error" : "ready";
+  const error = logsQuery.error ? describeApiError(logsQuery.error) : null;
 
   return (
     <TabChrome

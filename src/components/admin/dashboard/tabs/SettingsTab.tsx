@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, FormEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,6 +10,7 @@ import { TabChrome } from "../TabChrome";
 import { DataState } from "../DataState";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 
 type SystemSettingsType = {
   institutionName: string;
@@ -26,44 +28,40 @@ type SystemSettingsType = {
 
 export function SettingsTab() {
   const [settings, setSettings] = useState<SystemSettingsType | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  const queryClient = useQueryClient();
+  const settingsQuery = useQuery({
+    queryKey: queryKeys.admin.settings,
+    queryFn: async () => {
+      const { data } = await api.get<SystemSettingsType>("/admin/settings");
+      return data;
+    }
+  });
+  const saveSettingsMutation = useMutation({
+    mutationFn: async (payload: SystemSettingsType) => {
+      const { data } = await api.put<SystemSettingsType>("/admin/settings", payload);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKeys.admin.settings, data);
+      setSettings(data);
+    }
+  });
+  const status = settingsQuery.isLoading ? "loading" : settingsQuery.isError ? "error" : "ready";
+  const error = settingsQuery.error ? describeApiError(settingsQuery.error) : null;
+  const saving = saveSettingsMutation.isPending;
 
   useEffect(() => {
-    let alive = true;
-    async function loadSettings() {
-      try {
-        const { data } = await api.get<SystemSettingsType>("/admin/settings");
-        if (alive) {
-          setSettings(data);
-          setStatus("ready");
-        }
-      } catch (err) {
-        if (alive) {
-          setError(describeApiError(err));
-          setStatus("error");
-        }
-      }
-    }
-    loadSettings();
-    return () => {
-      alive = false;
-    };
-  }, []);
+    if (settingsQuery.data) setSettings(settingsQuery.data);
+  }, [settingsQuery.data]);
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
     if (!settings) return;
-    setSaving(true);
     try {
-      const { data } = await api.put<SystemSettingsType>("/admin/settings", settings);
-      setSettings(data);
+      await saveSettingsMutation.mutateAsync(settings);
       alert("Settings saved successfully.");
     } catch (err) {
       alert("Failed to save settings: " + describeApiError(err));
-    } finally {
-      setSaving(false);
     }
   }
 

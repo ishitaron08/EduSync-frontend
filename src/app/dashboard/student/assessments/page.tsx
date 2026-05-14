@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { useDashboardGuard } from "@/lib/authGuard";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,24 +34,27 @@ type Attempt = {
 export default function StudentAssessmentsPage() {
   const allowed = useDashboardGuard("student");
   const router = useRouter();
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
-  const [attempts, setAttempts] = useState<Attempt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!allowed) return;
-    Promise.all([
-      api.get("/student/assessments"),
-      api.get("/student/assessments/results")
-    ])
-      .then(([assessmentRes, resultRes]) => {
-        setAssessments(Array.isArray(assessmentRes.data) ? assessmentRes.data : []);
-        setAttempts(Array.isArray(resultRes.data) ? resultRes.data : []);
-      })
-      .catch(err => setError(describeApiError(err)))
-      .finally(() => setLoading(false));
-  }, [allowed]);
+  const assessmentsQuery = useQuery({
+    queryKey: queryKeys.student.assessments,
+    queryFn: async () => {
+      const { data } = await api.get("/student/assessments");
+      return Array.isArray(data) ? data as Assessment[] : [];
+    },
+    enabled: allowed
+  });
+  const attemptsQuery = useQuery({
+    queryKey: queryKeys.student.assessmentResults,
+    queryFn: async () => {
+      const { data } = await api.get("/student/assessments/results");
+      return Array.isArray(data) ? data as Attempt[] : [];
+    },
+    enabled: allowed
+  });
+  const assessments = assessmentsQuery.data ?? [];
+  const attempts = attemptsQuery.data ?? [];
+  const loading = assessmentsQuery.isLoading || attemptsQuery.isLoading;
+  const queryError = assessmentsQuery.error ?? attemptsQuery.error;
+  const error = queryError ? describeApiError(queryError) : null;
 
   const completedAttemptByAssessment = useMemo(() => {
     const map = new Map<string, Attempt>();

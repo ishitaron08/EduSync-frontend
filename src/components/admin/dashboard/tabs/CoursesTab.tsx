@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAdminDashboardFilters } from "../hooks/useAdminDashboardFilters";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { DataState } from "../DataState";
@@ -37,36 +39,39 @@ function statusTone(status: CourseRow["moderationStatus"]) {
 }
 
 export function CoursesTab() {
-  const [courses, setCourses] = useState<CourseRow[]>([]);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
   const { search, setSearch, statusFilter, setStatusFilter } = useAdminDashboardFilters();
-  const [savingId, setSavingId] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-
-    async function loadCourses() {
-      setStatus("loading");
-      setError(null);
-      try {
-        const { data } = await api.get<CourseListResponse>("/admin/courses?limit=100");
-        if (!alive) return;
-        setCourses(Array.isArray(data?.courses) ? data.courses : []);
-        setStatus("ready");
-      } catch (loadError) {
-        if (!alive) return;
-        setCourses([]);
-        setError(describeApiError(loadError));
-        setStatus("error");
-      }
+  const queryClient = useQueryClient();
+  const coursesQuery = useQuery({
+    queryKey: queryKeys.admin.courses,
+    queryFn: async () => {
+      const { data } = await api.get<CourseListResponse>("/admin/courses?limit=100");
+      return Array.isArray(data?.courses) ? data.courses : [];
     }
-
-    loadCourses();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  });
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ courseId, nextStatus }: { courseId: string; nextStatus: CourseRow["moderationStatus"] }) =>
+      api.patch(`/admin/courses/${courseId}/status`, { status: nextStatus }),
+    onMutate: async ({ courseId, nextStatus }) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.admin.courses });
+      const previous = queryClient.getQueryData<CourseRow[]>(queryKeys.admin.courses) ?? [];
+      queryClient.setQueryData<CourseRow[]>(
+        queryKeys.admin.courses,
+        previous.map((course) => (course._id === courseId ? { ...course, moderationStatus: nextStatus } : course))
+      );
+      return { previous };
+    },
+    onError: (_err, _variables, context) => {
+      queryClient.setQueryData(queryKeys.admin.courses, context?.previous ?? []);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.courses });
+      queryClient.invalidateQueries({ queryKey: queryKeys.admin.metrics });
+    }
+  });
+  const courses = coursesQuery.data ?? [];
+  const status = coursesQuery.isLoading ? "loading" : coursesQuery.isError ? "error" : "ready";
+  const error = coursesQuery.error || updateStatusMutation.error ? describeApiError(coursesQuery.error ?? updateStatusMutation.error) : null;
+  const savingId = updateStatusMutation.variables?.courseId ?? null;
 
   const filteredCourses = useMemo(
     () =>
@@ -80,18 +85,7 @@ export function CoursesTab() {
   );
 
   async function updateStatus(courseId: string, nextStatus: CourseRow["moderationStatus"]) {
-    const previous = courses;
-    setSavingId(courseId);
-    setCourses((current) => current.map((course) => (course._id === courseId ? { ...course, moderationStatus: nextStatus } : course)));
-
-    try {
-      await api.patch(`/admin/courses/${courseId}/status`, { status: nextStatus });
-    } catch (updateError) {
-      setCourses(previous);
-      setError(describeApiError(updateError));
-    } finally {
-      setSavingId(null);
-    }
+    updateStatusMutation.mutate({ courseId, nextStatus });
   }
 
   function renderCourseActions(course: CourseRow) {

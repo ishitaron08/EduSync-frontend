@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   UsersRound,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { DataState } from "../DataState";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -66,35 +67,16 @@ function formatDate(dateString: string) {
 }
 
 export function OverviewTab() {
-  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-
-    async function loadDashboard() {
-      setStatus("loading");
-      setError(null);
-      try {
-        const { data } = await api.get<DashboardMetrics>("/admin/metrics/dashboard");
-        if (!alive) return;
-        setMetrics(data);
-        setStatus("ready");
-      } catch (loadError) {
-        if (!alive) return;
-        setMetrics(null);
-        setError(describeApiError(loadError));
-        setStatus("error");
-      }
+  const metricsQuery = useQuery({
+    queryKey: queryKeys.admin.metrics,
+    queryFn: async () => {
+      const { data } = await api.get<DashboardMetrics>("/admin/metrics/dashboard");
+      return data;
     }
-
-    loadDashboard();
-
-    return () => {
-      alive = false;
-    };
-  }, []);
+  });
+  const metrics = metricsQuery.data ?? null;
+  const status = metricsQuery.isLoading ? "loading" : metricsQuery.isError ? "error" : "ready";
+  const error = metricsQuery.error ? describeApiError(metricsQuery.error) : null;
 
   return (
     <TabChrome

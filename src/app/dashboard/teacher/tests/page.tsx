@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { describeApiError } from "@/lib/apiErrors";
 import api from "@/lib/api";
+import { queryKeys } from "@/lib/queryKeys";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -109,8 +111,7 @@ export default function TeacherTestsPage() {
   const searchParams = useSearchParams();
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [sections, setSections] = useState<TeacherSection[]>([]);
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const queryClient = useQueryClient();
 
   const [title, setTitle] = useState("");
   const [sectionId, setSectionId] = useState("");
@@ -123,23 +124,53 @@ export default function TeacherTestsPage() {
   const [writtenQuestions, setWrittenQuestions] = useState<WrittenQuestion[]>([blankWrittenQuestion()]);
   const [writtenSourceMode, setWrittenSourceMode] = useState<WrittenSourceMode>("typed");
   const [testTypeTab, setTestTypeTab] = useState<"mcq" | "written" | "history">("mcq");
-  const [saving, setSaving] = useState(false);
+  const sectionsQuery = useQuery({
+    queryKey: queryKeys.teacher.sections,
+    queryFn: async () => {
+      const { data } = await api.get<TeacherSection[]>("/teacher/sections");
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: allowed
+  });
+  const assessmentsQuery = useQuery({
+    queryKey: queryKeys.teacher.assessments,
+    queryFn: async () => {
+      const { data } = await api.get<Assessment[]>("/teacher/assessments");
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: allowed
+  });
+  const createAssessmentMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => api.post("/teacher/assessments", payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.teacher.assessments });
+    }
+  });
+  const publishAssessmentMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/teacher/assessments/${id}/publish`),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.teacher.assessments });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.admin.assessments });
+    }
+  });
+  const deleteAssessmentMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/teacher/assessments/${id}`),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.teacher.assessments });
+    }
+  });
+  const sections = sectionsQuery.data ?? [];
+  const assessments = assessmentsQuery.data ?? [];
+  const saving = createAssessmentMutation.isPending;
 
   useEffect(() => {
-    if (!allowed) return;
-    api.get<TeacherSection[]>("/teacher/sections")
-      .then((res) => {
-        const fetched = Array.isArray(res.data) ? res.data : [];
-        setSections(fetched);
-        const urlSection = searchParams.get("section");
-        if (urlSection && fetched.some(section => section._id === urlSection)) {
-          setSectionId(urlSection);
-        } else if (!sectionId && fetched.length > 0) {
-          setSectionId(fetched[0]._id);
-        }
-      })
-      .catch((e) => setLoadErr(describeApiError(e)));
-  }, [allowed, sectionId, searchParams]);
+    const urlSection = searchParams.get("section");
+    if (urlSection && sections.some(section => section._id === urlSection)) {
+      setSectionId(urlSection);
+    } else if (!sectionId && sections.length > 0) {
+      setSectionId(sections[0]._id);
+    }
+  }, [sectionId, sections, searchParams]);
 
   useEffect(() => {
     const urlType = searchParams.get("type");
@@ -148,15 +179,10 @@ export default function TeacherTestsPage() {
     }
   }, [searchParams]);
 
-  async function loadAssessments() {
-    const { data } = await api.get<Assessment[]>("/teacher/assessments");
-    setAssessments(Array.isArray(data) ? data : []);
-  }
-
   useEffect(() => {
-    if (!allowed) return;
-    loadAssessments().catch((e) => setLoadErr(describeApiError(e)));
-  }, [allowed]);
+    const queryError = sectionsQuery.error ?? assessmentsQuery.error;
+    if (queryError) setLoadErr(describeApiError(queryError));
+  }, [assessmentsQuery.error, sectionsQuery.error]);
 
   const commonValid = title.trim() && sectionId && Number(duration) > 0 && startTime && endTime;
   const mcqValid = Boolean(commonValid && questions.length > 0 && questions.every(questionIsValid));
@@ -166,10 +192,6 @@ export default function TeacherTestsPage() {
       ? hasValidWrittenQuestions
       : Boolean(fileUrl.trim());
   const writtenValid = Boolean(commonValid && rubric.trim() && writtenSourceValid);
-
-  if (!allowed) {
-    return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
-  }
 
   function updateTestsUrl(next: { section?: string; type?: "mcq" | "written" | "history" }) {
     const params = new URLSearchParams(searchParams.toString());
@@ -212,7 +234,6 @@ export default function TeacherTestsPage() {
 
   async function handleCreateTest(type: "mcq" | "written") {
     try {
-      setSaving(true);
       setLoadErr(null);
       setSuccess(null);
       const writtenQuestionsPayload =
@@ -223,7 +244,7 @@ export default function TeacherTestsPage() {
         type === "written" && (writtenSourceMode === "link" || writtenSourceMode === "upload")
           ? fileUrl
           : undefined;
-      await api.post("/teacher/assessments", {
+      await createAssessmentMutation.mutateAsync({
         title,
         section: sectionId,
         type,
@@ -238,22 +259,18 @@ export default function TeacherTestsPage() {
       });
       setSuccess("Test draft created.");
       resetForm();
-      await loadAssessments();
       setTestTypeTab("history");
       updateTestsUrl({ section: sectionId, type: "history" });
     } catch (e) {
       setLoadErr(describeApiError(e));
-    } finally {
-      setSaving(false);
     }
   }
 
   async function publishAssessment(id: string) {
     try {
       setLoadErr(null);
-      await api.patch(`/teacher/assessments/${id}/publish`);
+      await publishAssessmentMutation.mutateAsync(id);
       setSuccess("Test published.");
-      await loadAssessments();
     } catch (e) {
       setLoadErr(describeApiError(e));
     }
@@ -263,9 +280,8 @@ export default function TeacherTestsPage() {
     if (!confirm("Delete this draft test?")) return;
     try {
       setLoadErr(null);
-      await api.delete(`/teacher/assessments/${id}`);
+      await deleteAssessmentMutation.mutateAsync(id);
       setSuccess("Draft deleted.");
-      await loadAssessments();
     } catch (e) {
       setLoadErr(describeApiError(e));
     }
@@ -313,6 +329,10 @@ export default function TeacherTestsPage() {
     () => [...assessments].sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()),
     [assessments]
   );
+
+  if (!allowed) {
+    return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
+  }
 
   return (
     <main className="mx-auto max-w-6xl px-3 py-4 md:px-6 md:py-6">

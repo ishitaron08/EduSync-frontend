@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,37 +53,46 @@ interface AttendanceRecord {
 
 export default function StudentAttendancePage() {
   const allowed = useDashboardGuard("student");
+  const queryClient = useQueryClient();
   const [scanning, setScanning] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const [stats, setStats] = useState<AttendanceStats | null>(null);
-  const [history, setHistory] = useState<AttendanceRecord[]>([]);
-  const [statsLoading, setStatsLoading] = useState(true);
-  const [historyLoading, setHistoryLoading] = useState(true);
-
-  const fetchStats = useCallback(() => {
-    setStatsLoading(true);
-    api.get("/student/attendance/stats")
-      .then(res => setStats(res.data))
-      .catch(() => {})
-      .finally(() => setStatsLoading(false));
-  }, []);
-
-  const fetchHistory = useCallback(() => {
-    setHistoryLoading(true);
-    api.get("/student/attendance/history", { params: { limit: 10 } })
-      .then(res => setHistory(res.data.records || []))
-      .catch(() => {})
-      .finally(() => setHistoryLoading(false));
-  }, []);
-
-  useEffect(() => {
-    if (!allowed) return;
-    fetchStats();
-    fetchHistory();
-  }, [allowed, fetchStats, fetchHistory]);
+  const statsQuery = useQuery({
+    queryKey: queryKeys.student.attendanceStats,
+    queryFn: async () => {
+      const { data } = await api.get<AttendanceStats>("/student/attendance/stats");
+      return data;
+    },
+    enabled: allowed
+  });
+  const historyQuery = useQuery({
+    queryKey: queryKeys.student.attendanceHistory(10),
+    queryFn: async () => {
+      const { data } = await api.get<{ records?: AttendanceRecord[] }>("/student/attendance/history", { params: { limit: 10 } });
+      return data.records || [];
+    },
+    enabled: allowed
+  });
+  const scanMutation = useMutation({
+    mutationFn: (token: string) => api.post("/student/attendance/scan", { token }),
+    onSuccess: async ({ data }) => {
+      setSuccess(data.message || "Attendance marked successfully.");
+      setError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.student.attendanceStats }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.student.attendanceHistory(10) })
+      ]);
+    },
+    onError: (err) => {
+      setError(describeApiError(err) || "Invalid or Expired QR Code. Please ask teacher to generate new code.");
+      setSuccess(null);
+    }
+  });
+  const stats = statsQuery.data ?? null;
+  const history = historyQuery.data ?? [];
+  const statsLoading = statsQuery.isLoading;
+  const historyLoading = historyQuery.isLoading;
+  const submitting = scanMutation.isPending;
 
   if (!allowed) {
     return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
@@ -91,22 +102,7 @@ export default function StudentAttendancePage() {
     if (!submitting && detectedCodes.length > 0) {
       const token = detectedCodes[0].rawValue;
       setScanning(false);
-      setSubmitting(true);
-      try {
-        const { data } = await api.post("/student/attendance/scan", { token });
-        setSuccess(data.message || "Attendance marked successfully.");
-        setError(null);
-
-        // Refresh stats and history after successful scan
-        fetchStats();
-        fetchHistory();
-
-      } catch (err) {
-        setError(describeApiError(err) || "Invalid or Expired QR Code. Please ask teacher to generate new code.");
-        setSuccess(null);
-      } finally {
-        setSubmitting(false);
-      }
+      scanMutation.mutate(token);
     }
   };
 

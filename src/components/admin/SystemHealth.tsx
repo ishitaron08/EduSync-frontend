@@ -1,27 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { getBackendOrigin } from "@/lib/backendOrigin";
+import { queryKeys } from "@/lib/queryKeys";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 
 export function SystemHealth() {
-  const [ms, setMs] = useState<number | null>(null);
-  const [status, setStatus] = useState<"ok" | "err">("ok");
-
-  useEffect(() => {
+  const healthQuery = useQuery({
+    queryKey: queryKeys.health.system,
+    queryFn: async () => {
     const origin = getBackendOrigin();
     const start = performance.now();
-    fetch(`${origin}/health`)
-      .then((r) => {
-        setMs(Math.round(performance.now() - start));
-        setStatus(r.ok ? "ok" : "err");
-      })
-      .catch(() => {
-        setStatus("err");
-        setMs(null);
-      });
-  }, []);
+      const response = await fetch(`${origin}/health`);
+      return { ms: Math.round(performance.now() - start), ok: response.ok };
+    },
+    refetchInterval: 60 * 1000
+  });
+  const ms = healthQuery.data?.ms ?? null;
+  const status: "ok" | "err" = healthQuery.data?.ok && !healthQuery.isError ? "ok" : "err";
 
   const spark = [12, 18, 14, 22, 19, 24, 20];
 

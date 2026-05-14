@@ -10,6 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, User, Key, Target, Activity, Loader2 } from "lucide-react";
 
+const PRESET_GOALS = ["Academic Improvement", "Placement Preparation", "Skill Development"];
+
 export default function StudentProfilePage() {
   const allowed = useDashboardGuard("student");
   const [profile, setProfile] = useState<any>(null);
@@ -115,16 +117,23 @@ export default function StudentProfilePage() {
                 <div className="space-y-4">
                   <div>
                     <label className="text-xs uppercase text-[var(--text-muted)] tracking-wider">Current Goal</label>
-                    <Select value={goal} onValueChange={setGoal}>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select a goal" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Academic Improvement">Academic Improvement</SelectItem>
-                        <SelectItem value="Placement Preparation">Placement Preparation</SelectItem>
-                        <SelectItem value="Skill Development">Skill Development</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {goal && !PRESET_GOALS.includes(goal) ? (
+                      <Input className="mt-1" value={goal} onChange={e => setGoal(e.target.value)} placeholder="Custom learning goal" />
+                    ) : (
+                      <Select value={goal} onValueChange={setGoal}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Select a goal" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Academic Improvement">Academic Improvement</SelectItem>
+                          <SelectItem value="Placement Preparation">Placement Preparation</SelectItem>
+                          <SelectItem value="Skill Development">Skill Development</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {goal && !PRESET_GOALS.includes(goal) && (
+                      <p className="mt-2 text-xs text-[var(--text-muted)]">This is a custom goal selected from Syllabus Goals.</p>
+                    )}
                   </div>
                   
                   {isGoalChanged && (

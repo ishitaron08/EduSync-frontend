@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { TabChrome, AdminEmptyState } from "../TabChrome";
 import { DataState } from "../DataState";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 
 type AnalyticsData = {
@@ -18,31 +19,16 @@ type AnalyticsData = {
 const COLORS = ["#0ea5e9", "#10b981", "#f59e0b", "#8b5cf6", "#ec4899"];
 
 export function AnalyticsTab() {
-  const [data, setData] = useState<AnalyticsData | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    async function loadData() {
-      try {
-        const res = await api.get<AnalyticsData>("/admin/analytics/learning");
-        if (alive) {
-          setData(res.data);
-          setStatus("ready");
-        }
-      } catch (err) {
-        if (alive) {
-          setError(describeApiError(err));
-          setStatus("error");
-        }
-      }
+  const analyticsQuery = useQuery({
+    queryKey: queryKeys.admin.learningAnalytics,
+    queryFn: async () => {
+      const res = await api.get<AnalyticsData>("/admin/analytics/learning");
+      return res.data;
     }
-    loadData();
-    return () => {
-      alive = false;
-    };
-  }, []);
+  });
+  const data = analyticsQuery.data ?? null;
+  const status = analyticsQuery.isLoading ? "loading" : analyticsQuery.isError ? "error" : "ready";
+  const error = analyticsQuery.error ? describeApiError(analyticsQuery.error) : null;
 
   return (
     <TabChrome

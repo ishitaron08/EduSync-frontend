@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,33 +29,40 @@ export default function TeacherAnalyticsPage() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [tests, setTests] = useState<TestRecord[]>([]);
   const [selectedTest, setSelectedTest] = useState<string>("");
-  const [analytics, setAnalytics] = useState<TestAnalytics | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const testsQuery = useQuery({
+    queryKey: queryKeys.teacher.assessments,
+    queryFn: async () => {
+      const { data } = await api.get<TestRecord[]>("/teacher/assessments");
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: allowed
+  });
+  const analyticsQuery = useQuery({
+    queryKey: queryKeys.teacher.assessmentAnalytics(selectedTest),
+    queryFn: async () => {
+      const { data } = await api.get<TestAnalytics>(`/teacher/assessments/${selectedTest}/analytics`);
+      return data;
+    },
+    enabled: allowed && Boolean(selectedTest)
+  });
+  const tests = testsQuery.data ?? [];
+  const analytics = analyticsQuery.data ?? null;
 
   useEffect(() => {
-    if (!allowed) return;
-    api.get<TestRecord[]>("/teacher/assessments")
-      .then((res) => {
-        setTests(Array.isArray(res.data) ? res.data : []);
-        const urlTest = searchParams.get("test");
-        if (urlTest && res.data.some(test => test._id === urlTest)) {
-          setSelectedTest(urlTest);
-        } else if (res.data.length > 0) {
-          setSelectedTest(res.data[0]._id);
-        }
-      })
-      .catch((e) => setLoadErr(describeApiError(e)));
-  }, [allowed, searchParams]);
+    const urlTest = searchParams.get("test");
+    if (urlTest && tests.some(test => test._id === urlTest)) {
+      setSelectedTest(urlTest);
+    } else if (!selectedTest && tests.length > 0) {
+      setSelectedTest(tests[0]._id);
+    }
+  }, [searchParams, selectedTest, tests]);
 
   useEffect(() => {
-    if (!selectedTest) return;
-    setAnalytics(null);
-    api.get<TestAnalytics>(`/teacher/assessments/${selectedTest}/analytics`)
-      .then((res) => setAnalytics(res.data))
-      .catch((e) => setLoadErr(describeApiError(e)));
-  }, [selectedTest]);
+    const queryError = testsQuery.error ?? analyticsQuery.error;
+    if (queryError) setLoadErr(describeApiError(queryError));
+  }, [analyticsQuery.error, testsQuery.error]);
 
   if (!allowed) return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
 
@@ -105,7 +114,9 @@ export default function TeacherAnalyticsPage() {
 
       {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)]">{loadErr}</p>}
 
-      {!analytics ? (
+      {analyticsQuery.isLoading ? (
+        <Card className="p-6 text-center text-[var(--text-muted)]">Loading analytics...</Card>
+      ) : !analytics ? (
         <Card className="p-6 text-center text-[var(--text-muted)]">Select a test to view analytics...</Card>
       ) : (
         <div className="grid gap-6">

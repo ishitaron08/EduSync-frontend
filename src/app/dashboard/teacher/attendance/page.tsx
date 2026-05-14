@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -77,6 +79,7 @@ export default function TeacherAttendancePage() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const [sectionId, setSectionId] = useState("");
   const [slotKey, setSlotKey] = useState("");
   const [mode, setMode] = useState<AttendanceMode>("qr");
@@ -87,10 +90,76 @@ export default function TeacherAttendancePage() {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [loadErr, setLoadErr] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [students, setStudents] = useState<AttendanceStudent[]>([]);
-  const [sections, setSections] = useState<TeacherSection[]>([]);
-  const [savingStudentId, setSavingStudentId] = useState<string | null>(null);
+  const todaySessionDate = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const sectionsQuery = useQuery({
+    queryKey: queryKeys.teacher.sections,
+    queryFn: async () => {
+      const { data } = await api.get<TeacherSection[]>("/teacher/sections");
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: allowed
+  });
+  const attendanceQuery = useQuery({
+    queryKey: queryKeys.teacher.attendanceLive(sectionId, slotKey, todaySessionDate),
+    queryFn: async () => {
+      const [studentsRes, recordsRes] = await Promise.all([
+        api.get<{ students?: AttendanceStudent[] }>(`/teacher/attendance/students?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}`),
+        api.get<LiveStatusResponse>(`/teacher/attendance/live-status?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}&sessionDate=${new Date().toISOString()}`)
+      ]);
+      return {
+        students: studentsRes.data.students || [],
+        records: recordsRes.data.records || recordsRes.data.scannedStudents || [],
+        session: recordsRes.data.session ?? null
+      };
+    },
+    enabled: allowed && Boolean(sectionId && slotKey),
+    refetchInterval: token ? 5000 : false
+  });
+  const generateQrMutation = useMutation({
+    mutationFn: () =>
+      api.post("/teacher/attendance/generate", {
+        sectionId: sectionId.trim(),
+        slotKey
+      }),
+    onSuccess: async ({ data }) => {
+      setToken(data.token);
+      setQrSessionId(data.qrSessionId);
+      setActiveSession({
+        _id: data.qrSessionId,
+        mode: "qr",
+        status: "active",
+        expiresAt: data.expiresAt
+      });
+      setExpiresAt(new Date(data.expiresAt));
+      setLoadErr(null);
+      setMessage("QR attendance session started.");
+      await queryClient.invalidateQueries({ queryKey: queryKeys.teacher.attendanceLive(sectionId, slotKey, todaySessionDate) });
+    },
+    onError: (error) => setLoadErr(describeApiError(error))
+  });
+  const manualAttendanceMutation = useMutation({
+    mutationFn: ({ studentId, status }: { studentId: string; status: AttendanceStatus }) =>
+      api.post("/teacher/attendance", {
+        student: studentId,
+        section: sectionId,
+        slotKey,
+        sessionDate: new Date().toISOString(),
+        className: selectedSlot?.className,
+        subject: selectedSlot?.subject,
+        status
+      }),
+    onSuccess: async ({ data }, { studentId, status }) => {
+      if (data.session) setActiveSession(data.session);
+      setMessage(`${students.find(student => student._id === studentId)?.name ?? "Student"} marked ${statusLabels[status].toLowerCase()}.`);
+      setLoadErr(null);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.teacher.attendanceLive(sectionId, slotKey, todaySessionDate) });
+    },
+    onError: (error) => setLoadErr(describeApiError(error))
+  });
+  const sections = sectionsQuery.data ?? [];
+  const students = attendanceQuery.data?.students ?? [];
+  const records = attendanceQuery.data?.records ?? [];
+  const savingStudentId = manualAttendanceMutation.variables?.studentId ?? null;
 
   const selectedSection = useMemo(
     () => sections.find(section => section._id === sectionId),
@@ -108,49 +177,24 @@ export default function TeacherAttendancePage() {
 
   useEffect(() => {
     if (!allowed) return;
-    api.get<TeacherSection[]>("/teacher/sections")
-      .then((res) => {
-        const fetched = Array.isArray(res.data) ? res.data : [];
-        setSections(fetched);
-        const urlSection = searchParams.get("section");
-        const nextSection = fetched.find(section => section._id === urlSection) ?? fetched[0];
-        setSectionId(nextSection?._id ?? "");
-        const urlSlot = searchParams.get("slot");
-        const sectionSlots = nextSection?.attendanceSlots ?? [];
-        const nextSlot = sectionSlots.find(slot => slot.key === urlSlot) ?? sectionSlots[0];
-        setSlotKey(nextSlot?.key ?? "");
-      })
-      .catch((e) => setLoadErr(describeApiError(e)));
-  }, [allowed, searchParams]);
+    const urlSection = searchParams.get("section");
+    const nextSection = sections.find(section => section._id === urlSection) ?? sections[0];
+    setSectionId(nextSection?._id ?? "");
+    const urlSlot = searchParams.get("slot");
+    const sectionSlots = nextSection?.attendanceSlots ?? [];
+    const nextSlot = sectionSlots.find(slot => slot.key === urlSlot) ?? sectionSlots[0];
+    setSlotKey(nextSlot?.key ?? "");
+  }, [allowed, searchParams, sections]);
 
   useEffect(() => {
     if (!sectionId || !slotKey) {
-      setStudents([]);
-      setRecords([]);
       setActiveSession(null);
       return;
     }
-
-    let alive = true;
-    Promise.all([
-      api.get(`/teacher/attendance/students?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}`),
-      api.get<LiveStatusResponse>(`/teacher/attendance/live-status?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}&sessionDate=${new Date().toISOString()}`)
-    ])
-      .then(([studentsRes, recordsRes]) => {
-        if (!alive) return;
-        setStudents(studentsRes.data.students || []);
-        setRecords(recordsRes.data.records || recordsRes.data.scannedStudents || []);
-        setActiveSession(recordsRes.data.session ?? null);
-        setLoadErr(null);
-      })
-      .catch((e) => {
-        if (alive) setLoadErr(describeApiError(e));
-      });
-
-    return () => {
-      alive = false;
-    };
-  }, [sectionId, slotKey]);
+    setActiveSession(attendanceQuery.data?.session ?? null);
+    if (attendanceQuery.error) setLoadErr(describeApiError(attendanceQuery.error));
+    if (!attendanceQuery.error) setLoadErr(null);
+  }, [attendanceQuery.data?.session, attendanceQuery.error, sectionId, slotKey]);
 
   useEffect(() => {
     if (!expiresAt) return;
@@ -164,24 +208,6 @@ export default function TeacherAttendancePage() {
     }, 1000);
     return () => clearInterval(interval);
   }, [expiresAt]);
-
-  useEffect(() => {
-    if (!token || !sectionId || !slotKey) return;
-    let alive = true;
-    const poll = setInterval(async () => {
-      try {
-        const { data } = await api.get<LiveStatusResponse>(`/teacher/attendance/live-status?sectionId=${sectionId}&slotKey=${encodeURIComponent(slotKey)}&sessionDate=${new Date().toISOString()}`);
-        if (alive) setRecords(data.records || data.scannedStudents || []);
-        if (alive) setActiveSession(data.session ?? null);
-      } catch (err) {
-        console.error("Polling error", err);
-      }
-    }, 5000);
-    return () => {
-      alive = false;
-      clearInterval(poll);
-    };
-  }, [token, sectionId, slotKey]);
 
   if (!allowed) {
     return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
@@ -218,63 +244,11 @@ export default function TeacherAttendancePage() {
   }
 
   const generateToken = async () => {
-    try {
-      const { data } = await api.post("/teacher/attendance/generate", {
-        sectionId: sectionId.trim(),
-        slotKey
-      });
-      setToken(data.token);
-      setQrSessionId(data.qrSessionId);
-      setActiveSession({
-        _id: data.qrSessionId,
-        mode: "qr",
-        status: "active",
-        expiresAt: data.expiresAt
-      });
-      setExpiresAt(new Date(data.expiresAt));
-      setLoadErr(null);
-      setMessage("QR attendance session started.");
-    } catch (e) {
-      setLoadErr(describeApiError(e));
-    }
+    generateQrMutation.mutate();
   };
 
   async function markManual(studentId: string, status: AttendanceStatus) {
-    try {
-      setSavingStudentId(studentId);
-      const { data } = await api.post("/teacher/attendance", {
-        student: studentId,
-        section: sectionId,
-        slotKey,
-        sessionDate: new Date().toISOString(),
-        className: selectedSlot?.className,
-        subject: selectedSlot?.subject,
-        status
-      });
-      if (data.session) {
-        setActiveSession(data.session);
-      }
-      setRecords((current) => {
-        const withoutStudent = current.filter(record => record._id !== studentId);
-        const student = students.find(entry => entry._id === studentId);
-        return [
-          ...withoutStudent,
-          {
-            _id: studentId,
-            name: student?.name ?? data.student?.name ?? "Student",
-            email: student?.email,
-            status,
-            timestamp: data.updatedAt || data.createdAt || new Date().toISOString()
-          }
-        ];
-      });
-      setMessage(`${students.find(student => student._id === studentId)?.name ?? "Student"} marked ${statusLabels[status].toLowerCase()}.`);
-      setLoadErr(null);
-    } catch (e) {
-      setLoadErr(describeApiError(e));
-    } finally {
-      setSavingStudentId(null);
-    }
+    manualAttendanceMutation.mutate({ studentId, status });
   }
 
   const formatTime = (seconds: number) => {
