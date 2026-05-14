@@ -191,6 +191,12 @@ export default function StudentTimetablePage() {
 
   const selectedSlots = slotsByDay[selectedDay] ?? [];
   const freePeriods = slots.filter((slot) => slot.isFreePeriod);
+  const sectionLabel = timetableData?.sectionInfo
+    ? [
+        timetableData.sectionInfo.course?.code || timetableData.sectionInfo.course?.name,
+        timetableData.sectionInfo.sectionCode
+      ].filter(Boolean).join(" ")
+    : null;
 
   if (!allowed) {
     return (
@@ -208,6 +214,9 @@ export default function StudentTimetablePage() {
             <div>
               <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Week density</p>
               <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Day by day</h2>
+              {sectionLabel ? (
+                <p className="mt-1 text-sm text-[var(--text-muted)]">Section: {sectionLabel}</p>
+              ) : null}
             </div>
             <Route className="h-5 w-5 text-[var(--accent-primary)]" />
           </div>

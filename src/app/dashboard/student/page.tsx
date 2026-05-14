@@ -29,6 +29,15 @@ type StudentProfile = {
   rewardPoints?: number;
   streak?: number;
   learningGoal?: string;
+  section?: {
+    sectionCode?: string;
+    term?: string;
+    year?: number;
+    course?: {
+      code?: string;
+      name?: string;
+    };
+  } | null;
 };
 
 type StudentTask = {
@@ -104,6 +113,12 @@ export default function StudentDashboardPage() {
   });
 
   const profile = profileQuery.data ?? null;
+  const sectionLabel = profile?.section
+    ? [
+        profile.section.course?.code || profile.section.course?.name,
+        profile.section.sectionCode
+      ].filter(Boolean).join(" ")
+    : "Not assigned";
   const activeTasks = useMemo(() => (tasksQuery.data ?? []).filter((task) => task.status !== "completed"), [tasksQuery.data]);
   const completedTasks = useMemo(() => (tasksQuery.data ?? []).filter((task) => task.status === "completed"), [tasksQuery.data]);
   const nextTask = activeTasks[0] ?? null;
@@ -218,7 +233,7 @@ export default function StudentDashboardPage() {
                   <p className="text-lg font-semibold text-[var(--text-primary)]">{nextClass?.subject ?? "No class queued"}</p>
                 </div>
               </div>
-              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <p className="text-xs text-[var(--text-muted)]">Time</p>
                   <p className="font-medium text-[var(--text-primary)]">{nextClass ? `${nextClass.startTime} to ${nextClass.endTime}` : "Clear"}</p>
@@ -226,6 +241,10 @@ export default function StudentDashboardPage() {
                 <div>
                   <p className="text-xs text-[var(--text-muted)]">Room</p>
                   <p className="font-medium text-[var(--text-primary)]">{nextClass?.room ?? "Not assigned"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--text-muted)]">Section</p>
+                  <p className="truncate font-medium text-[var(--text-primary)]" title={sectionLabel}>{sectionLabel}</p>
                 </div>
                 <div>
                   <p className="text-xs text-[var(--text-muted)]">Prep</p>

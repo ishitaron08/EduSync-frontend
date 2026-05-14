@@ -1,7 +1,20 @@
 import axios from "axios";
 
+/**
+ * Normalises the API base URL so that it always ends with `/api`, regardless
+ * of how the deployment env var was configured. This avoids the classic
+ * "Route POST /auth/login not found" 404s when someone sets
+ * NEXT_PUBLIC_API_URL=https://example.com instead of
+ * NEXT_PUBLIC_API_URL=https://example.com/api.
+ */
+function resolveApiBaseUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api";
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+}
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api",
+  baseURL: resolveApiBaseUrl(),
   withCredentials: true
 });
 

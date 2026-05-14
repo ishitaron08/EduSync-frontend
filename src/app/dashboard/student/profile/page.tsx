@@ -18,6 +18,15 @@ type StudentProfile = {
   rewardPoints?: number;
   streak?: number;
   createdAt?: string;
+  section?: {
+    sectionCode?: string;
+    term?: string;
+    year?: number;
+    course?: {
+      code?: string;
+      name?: string;
+    };
+  } | null;
   pointsBreakdown?: {
     aiTasks?: number;
     tests?: number;
@@ -66,6 +75,15 @@ export default function StudentProfilePage() {
   const goalLibrary = goalLibraryQuery.data ?? [];
   const currentName = name ?? profile?.name ?? "";
   const currentGoal = goal ?? profile?.learningGoal ?? "";
+  const sectionLabel = profile?.section
+    ? [
+        profile.section.course?.code || profile.section.course?.name,
+        profile.section.sectionCode
+      ].filter(Boolean).join(" ")
+    : "Not assigned";
+  const sectionMeta = profile?.section
+    ? `${profile.section.term ? profile.section.term.charAt(0).toUpperCase() + profile.section.term.slice(1) : "Term"} ${profile.section.year ?? ""}`.trim()
+    : "Ask admin to link your account to a section.";
   const normalizedCurrentGoal = currentGoal.trim().toLowerCase();
   const matchingGoal = goalLibrary.find((item) => item.title.toLowerCase() === normalizedCurrentGoal);
   const savedGoal = profile?.learningGoal ?? "";
@@ -151,6 +169,13 @@ export default function StudentProfilePage() {
                     <Input className="bg-[var(--bg-elevated)] pl-9" value={profile?.email || ""} readOnly disabled />
                   </div>
                 </label>
+                <div className="space-y-1.5 md:col-span-2">
+                  <span className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Section</span>
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-3 py-2">
+                    <p className="font-medium text-[var(--text-primary)]">{sectionLabel}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{sectionMeta}</p>
+                  </div>
+                </div>
               </div>
             </section>
 

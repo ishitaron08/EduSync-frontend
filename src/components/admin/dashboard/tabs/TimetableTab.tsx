@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TabChrome } from "../TabChrome";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { queryKeys } from "@/lib/queryKeys";
-import { Plus, Trash2, Calendar as CalendarIcon, Edit2, FileText, Check, X, User, MapPin, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Calendar as CalendarIcon, Edit2, FileText, Check, X, User, MapPin, AlertCircle, ChevronDown, Search } from "lucide-react";
 
 type Slot = {
   day: string;
@@ -87,6 +87,173 @@ function teacherIdFrom(teacher: Slot["teacher"]) {
   return teacher?._id ?? "";
 }
 
+function teacherKey(teacher: Teacher) {
+  return teacher.id || teacher._id || "";
+}
+
+async function fetchAllTeachers() {
+  const limit = 100;
+  let page = 1;
+  let total = Number.POSITIVE_INFINITY;
+  const teachers: Teacher[] = [];
+
+  while (teachers.length < total) {
+    const { data } = await api.get<{ users?: Teacher[]; data?: Teacher[]; total?: number; page?: number; limit?: number } | Teacher[]>(
+      `/admin/users?role=teacher&page=${page}&limit=${limit}`
+    );
+    const pageTeachers = Array.isArray(data)
+      ? data
+      : Array.isArray(data.users)
+        ? data.users
+        : Array.isArray(data.data)
+          ? data.data
+          : [];
+
+    teachers.push(...pageTeachers);
+    total = Array.isArray(data) ? teachers.length : Number(data.total ?? teachers.length);
+    if (pageTeachers.length === 0 || page > 50) break;
+    page += 1;
+  }
+
+  return teachers
+    .filter((teacher) => teacherKey(teacher))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function TeacherPicker({
+  teachers,
+  value,
+  onChange,
+  disabled
+}: {
+  teachers: Teacher[];
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const pickerRef = useRef<HTMLDivElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const selectedTeacher = teachers.find((teacher) => teacherKey(teacher) === value);
+  const filteredTeachers = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return teachers;
+    return teachers.filter((teacher) => `${teacher.name} ${teacher.email}`.toLowerCase().includes(needle));
+  }, [query, teachers]);
+
+  useEffect(() => {
+    if (!open) return;
+    window.setTimeout(() => searchInputRef.current?.focus(), 0);
+  }, [open]);
+
+  return (
+    <div
+      ref={pickerRef}
+      className="relative"
+      onBlur={(event) => {
+        const nextFocus = event.relatedTarget;
+        if (nextFocus instanceof Node && pickerRef.current?.contains(nextFocus)) return;
+        setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        className="mt-1 flex h-10 w-full items-center justify-between gap-3 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-left text-sm text-[var(--text-primary)] transition-[border-color,background-color] hover:bg-[var(--bg-elevated)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--accent-primary)]/12 disabled:cursor-not-allowed disabled:opacity-60"
+        aria-expanded={open}
+      >
+        <span className={selectedTeacher ? "truncate" : "truncate text-[var(--text-muted)]"}>
+          {selectedTeacher ? `${selectedTeacher.name} (${selectedTeacher.email})` : "Select a teacher..."}
+        </span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
+      </button>
+
+      {open ? (
+        <div className="absolute z-40 mt-2 w-full min-w-[280px] rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 shadow-[var(--shadow-lift)]">
+          <div className="relative mb-2">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+            <Input
+              ref={searchInputRef}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onFocus={() => setOpen(true)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const firstTeacher = filteredTeachers[0];
+                  if (firstTeacher) {
+                    onChange(teacherKey(firstTeacher));
+                    setQuery("");
+                    setOpen(false);
+                  }
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setOpen(false);
+                }
+              }}
+              placeholder="Search teacher"
+              className="h-9 pr-9 pl-9"
+            />
+            {query ? (
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-[var(--text-muted)] transition-[background-color,color] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  setQuery("");
+                  searchInputRef.current?.focus();
+                }}
+                aria-label="Clear teacher search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
+          <div className="max-h-64 overflow-y-auto pr-1">
+            {filteredTeachers.length ? (
+              filteredTeachers.map((teacher) => {
+                const id = teacherKey(teacher);
+                const selected = id === value;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    className={[
+                      "flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm transition-[background-color,color]",
+                      selected
+                        ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                        : "text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+                    ].join(" ")}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => {
+                      onChange(id);
+                      setQuery("");
+                      setOpen(false);
+                    }}
+                  >
+                    <User className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{teacher.name}</span>
+                      <span className="block truncate text-xs text-[var(--text-muted)]">{teacher.email}</span>
+                    </span>
+                    {selected ? <Check className="mt-0.5 h-4 w-4 shrink-0" /> : null}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="rounded-md px-3 py-3 text-sm text-[var(--text-muted)]">No teachers match this search.</div>
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function TimetableTab() {
   const pathname = usePathname();
   const router = useRouter();
@@ -111,13 +278,12 @@ export function TimetableTab() {
     queryKey: ["admin", "timetable", "setup"],
     queryFn: async () => {
       const [teachersRes, sectionsRes, timetablesRes] = await Promise.all([
-        api.get("/admin/users?role=teacher&limit=100"),
+        fetchAllTeachers(),
         api.get<Section[]>("/admin/sections"),
         api.get<MasterTimetableInfo[]>("/admin/timetable/master/list")
       ]);
-      const fetchedTeachers = teachersRes.data.users || teachersRes.data.data || teachersRes.data;
       return {
-        teachers: Array.isArray(fetchedTeachers) ? fetchedTeachers as Teacher[] : [],
+        teachers: teachersRes,
         sections: Array.isArray(sectionsRes.data) ? sectionsRes.data : [],
         masterTimetables: Array.isArray(timetablesRes.data) ? timetablesRes.data : []
       };
@@ -291,6 +457,10 @@ export function TimetableTab() {
   function handleAddSlot(e: FormEvent) {
     e.preventDefault();
     if (!activeSlot || !timetable) return;
+    if (!slotForm.teacher) {
+      setError("Select a teacher before adding this slot.");
+      return;
+    }
     
     // Calculate end time (+1 hour)
     const [hh, mm] = activeSlot.time.split(":").map(Number);
@@ -316,6 +486,7 @@ export function TimetableTab() {
     });
     setActiveSlot(null);
     setSlotForm({ subject: "", teacher: "", room: "" });
+    setError(null);
   }
 
   function removeSlot(day: string, time: string) {
@@ -502,17 +673,15 @@ export function TimetableTab() {
                 </div>
                 <div className="min-w-0 sm:col-span-2 lg:col-span-1">
                   <label className="text-xs uppercase text-[var(--text-muted)]">Teacher</label>
-                  <select 
-                    required 
-                    value={slotForm.teacher} 
-                    onChange={(e) => setSlotForm({...slotForm, teacher: e.target.value})}
-                    className="mt-1 flex h-10 w-full items-center justify-between rounded-md border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                  >
-                    <option value="" disabled>Select a teacher...</option>
-                    {teachers.map(t => (
-                      <option key={t.id || t._id} value={t.id || t._id}>{t.name} ({t.email})</option>
-                    ))}
-                  </select>
+                  <TeacherPicker
+                    teachers={teachers}
+                    value={slotForm.teacher}
+                    onChange={(teacher) => setSlotForm({ ...slotForm, teacher })}
+                    disabled={teachers.length === 0}
+                  />
+                  {teachers.length === 0 ? (
+                    <p className="mt-1 text-xs text-[var(--accent-danger)]">No teacher accounts are available.</p>
+                  ) : null}
                 </div>
                 <Button type="submit" variant="filled">Add Slot</Button>
                 <Button type="button" variant="ghost" onClick={() => setActiveSlot(null)}>Cancel</Button>
