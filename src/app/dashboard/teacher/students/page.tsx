@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ResponsiveTable } from "@/components/ui/responsive-table";
+import { TeacherPageShell } from "@/components/teacher/TeacherPageShell";
 import { hueFromString } from "@/lib/hueFromString";
 import { Mail, AlertTriangle } from "lucide-react";
 
@@ -38,11 +39,7 @@ export default function TeacherStudentsPage() {
   if (!allowed) return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
 
   return (
-    <main className="mx-auto max-w-6xl px-3 py-4 md:px-6 md:py-6">
-      <div className="mb-6">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-2xl text-[var(--text-primary)] md:text-3xl">Student Progress</h1>
-        <p className="text-sm text-[var(--text-muted)]">Monitor class performance, attendance, and identify at-risk students.</p>
-      </div>
+    <TeacherPageShell>
 
       {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)]">{loadErr}</p>}
 
@@ -124,7 +121,7 @@ export default function TeacherStudentsPage() {
           renderCard={(s) => {
             const h = hueFromString(s.name);
             return (
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
                 <div className="flex items-start gap-3">
                   <div
                     className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-medium"
@@ -165,6 +162,6 @@ export default function TeacherStudentsPage() {
           }}
         />
       </Card>
-    </main>
+    </TeacherPageShell>
   );
 }

@@ -49,6 +49,7 @@ const EMPTY_FORM: UserFormState = {
 };
 
 const ROLE_OPTIONS = ["All roles", "student", "teacher", "admin"] as const;
+const EMPTY_USERS: AdminUserRow[] = [];
 
 function roleTone(role: AdminUserRow["role"]) {
   if (role === "admin") return "green" as const;
@@ -119,7 +120,7 @@ export function UsersTab() {
     },
     onError: (err) => setLocalError(describeApiError(err))
   });
-  const users = usersQuery.data?.users ?? [];
+  const users = usersQuery.data?.users ?? EMPTY_USERS;
   const total = usersQuery.data?.total ?? 0;
   const status = usersQuery.isLoading ? "loading" : usersQuery.isError ? "error" : "ready";
   const error = localError ?? (usersQuery.error ? describeApiError(usersQuery.error) : null);
@@ -190,9 +191,6 @@ export function UsersTab() {
   return (
     <div className="space-y-6">
       <TabChrome
-        eyebrow="Users"
-        title="User management"
-        description="Create, update, and remove users backed by the live admin API."
         actions={
           <Button
             type="button"
@@ -206,8 +204,7 @@ export function UsersTab() {
       >
         {/* items-start prevents CSS Grid from stretching the left card to match the right card's height */}
         <div className="grid items-start gap-6 xl:grid-cols-12">
-        {/* sticky: pins the form once the user scrolls past the TabChrome header.
-            top-6 matches the page's py-6 padding so it sits flush at the scroll viewport edge. */}
+        {/* Sticky keeps the edit form reachable while reviewing long user lists. */}
         <Card className="p-2.5 md:p-3.5 xl:col-span-4 xl:sticky xl:top-6">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -238,7 +235,7 @@ export function UsersTab() {
             <div className="grid gap-2 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Role</label>
-                <select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as AdminUserRow["role"] }))} className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-primary)]">
+                <select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value as AdminUserRow["role"] }))} className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-primary)]">
                   <option value="student">Student</option>
                   <option value="teacher">Teacher</option>
                   <option value="admin">Admin</option>
@@ -294,7 +291,7 @@ export function UsersTab() {
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
                 <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name, email, or role" className="pl-9" />
               </div>
-              <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)} className="h-10 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-primary)]">
+              <select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value as typeof roleFilter)} className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 text-sm text-[var(--text-primary)]">
                 {ROLE_OPTIONS.map((option) => (
                   <option key={option} value={option}>
                     {option === "All roles" ? "All roles" : option.charAt(0).toUpperCase() + option.slice(1)}
@@ -362,7 +359,7 @@ export function UsersTab() {
                   </table>
                 }
                 renderCard={(user) => (
-                  <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+                  <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="truncate font-medium text-[var(--text-primary)]">{user.name}</p>
@@ -447,7 +444,7 @@ export function UsersTab() {
                         onClick={() => setPage(n)}
                         className={
                           n === page
-                            ? "flex h-8 min-w-[32px] items-center justify-center rounded-lg bg-[var(--accent-primary)] px-2.5 text-xs font-semibold text-white"
+                            ? "flex h-8 min-w-[32px] items-center justify-center rounded-lg bg-[var(--accent-primary)] px-2.5 text-xs font-semibold text-[var(--text-inverse)]"
                             : "flex h-8 min-w-[32px] items-center justify-center rounded-lg px-2.5 text-xs text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
                         }
                       >

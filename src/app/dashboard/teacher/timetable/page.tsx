@@ -7,9 +7,8 @@ import { hueFromString } from "@/lib/hueFromString";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TeacherPageShell } from "@/components/teacher/TeacherPageShell";
 import { BookOpen, Clock, MapPin, Coffee } from "lucide-react";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 type ScheduleSlot = {
   day: string;
@@ -35,21 +34,17 @@ type ScheduleResponse = {
   schedules: Schedule[];
 };
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
 const WEEK_DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"] as const;
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
 
 function FreePeriodCell({ slot }: { slot: ScheduleSlot }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 p-3 text-center min-h-[72px]">
+    <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-elevated)]/50 p-3 text-center min-h-[72px]">
       <Coffee className="h-3.5 w-3.5 text-[var(--text-muted)]" />
       <span className="text-[10px] font-medium uppercase tracking-wide text-[var(--text-muted)]">
         Available
       </span>
       <span className="font-mono text-[10px] text-[var(--text-muted)]">
-        {slot.startTime}–{slot.endTime}
+        {slot.startTime}-{slot.endTime}
       </span>
     </div>
   );
@@ -59,8 +54,8 @@ function ClassCell({ slot }: { slot: ScheduleSlot }) {
   const hue = hueFromString(slot.subject);
   return (
     <div
-      className="flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 shadow-sm min-h-[72px]"
-      style={{ borderLeftWidth: 4, borderLeftColor: `hsl(${hue} 55% 52%)` }}
+      className="flex min-h-[72px] flex-col justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 shadow-sm"
+      style={{ boxShadow: `inset 0 0 0 1px hsl(${hue} 45% 65% / 0.35)` }}
     >
       <p
         className="font-[family-name:var(--font-fraunces)] font-semibold leading-tight text-[var(--text-primary)]"
@@ -69,7 +64,7 @@ function ClassCell({ slot }: { slot: ScheduleSlot }) {
         {slot.subject}
       </p>
       <p className="font-mono text-[10px] text-[var(--text-muted)] mt-0.5">
-        {slot.startTime}–{slot.endTime}
+        {slot.startTime}-{slot.endTime}
       </p>
       <div className="mt-2 flex flex-wrap gap-1">
         {slot.room && (
@@ -117,7 +112,7 @@ function WeekGrid({ slots }: { slots: ScheduleSlot[] }) {
 
           {/* Slots */}
           {byDay(day).length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-center min-h-[72px]">
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-[var(--border-subtle)] p-4 text-center min-h-[72px]">
               <Coffee className="h-4 w-4 text-[var(--text-muted)]" />
               <span className="mt-1 text-[10px] text-[var(--text-muted)]">Free day</span>
             </div>
@@ -158,7 +153,7 @@ function WeekList({ slots }: { slots: ScheduleSlot[] }) {
               {day}
             </p>
             {daySlots.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-[var(--border-subtle)] p-4 text-sm text-[var(--text-muted)]">
+              <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-4 text-sm text-[var(--text-muted)]">
                 Free day
               </div>
             ) : (
@@ -173,11 +168,9 @@ function WeekList({ slots }: { slots: ScheduleSlot[] }) {
   );
 }
 
-// ─── Stats bar ────────────────────────────────────────────────────────────────
-
 function ScheduleStats({ slots }: { slots: ScheduleSlot[] }) {
-  const classes   = slots.filter((s) => !s.isFreePeriod);
-  const freeMins  = slots
+  const classes = slots.filter((s) => !s.isFreePeriod);
+  const freeMins = slots
     .filter((s) => s.isFreePeriod)
     .reduce((acc, s) => acc + (s.durationMinutes ?? 0), 0);
   const freeHours = Math.round(freeMins / 60);
@@ -202,8 +195,6 @@ function ScheduleStats({ slots }: { slots: ScheduleSlot[] }) {
     </div>
   );
 }
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TeacherTimetablePage() {
   const allowed = useDashboardGuard("teacher");
@@ -241,22 +232,13 @@ export default function TeacherTimetablePage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-3 py-4 md:px-6 md:py-6">
-      {/* Page header */}
-      <div className="mb-6">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-2xl text-[var(--text-primary)] md:text-3xl">
-          My Schedule
-        </h1>
-        <p className="mt-1 text-sm text-[var(--text-muted)]">
-          Weekly view of your assigned classes. Available slots are shown as free periods.
-        </p>
-      </div>
+    <TeacherPageShell>
 
       {/* Loading skeleton */}
       {loading && (
         <div className="space-y-4">
-          <div className="nc-skeleton h-40 w-full rounded-2xl" />
-          <div className="nc-skeleton h-40 w-full rounded-2xl" />
+          <div className="nc-skeleton h-40 w-full rounded-lg" />
+          <div className="nc-skeleton h-40 w-full rounded-lg" />
         </div>
       )}
 
@@ -312,6 +294,6 @@ export default function TeacherTimetablePage() {
           ))}
         </div>
       )}
-    </main>
+    </TeacherPageShell>
   );
 }

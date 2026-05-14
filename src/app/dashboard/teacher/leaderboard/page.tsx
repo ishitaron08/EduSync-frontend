@@ -6,6 +6,7 @@ import { describeApiError } from "@/lib/apiErrors";
 import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
+import { TeacherPageShell } from "@/components/teacher/TeacherPageShell";
 import { hueFromString } from "@/lib/hueFromString";
 import { Trophy, Medal, Star } from "lucide-react";
 
@@ -27,16 +28,11 @@ export default function TeacherLeaderboardPage() {
   if (!allowed) return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6 md:px-6">
-      <div className="mb-6 text-center">
-        <Trophy className="mx-auto h-12 w-12 text-[var(--accent-amber)] mb-4" />
-        <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">Institution Leaderboard</h1>
-        <p className="text-sm text-[var(--text-muted)] mt-2">Recognize the highest performers across the institution.</p>
-      </div>
+    <TeacherPageShell maxWidth="compact">
 
       {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)] text-center">{loadErr}</p>}
 
-      <Card className="p-2 md:p-6 bg-gradient-to-b from-[var(--bg-surface)] to-[var(--bg-elevated)] border-[var(--accent-amber)]/20 shadow-lg">
+      <Card className="p-3 md:p-5">
         <div className="space-y-3">
           {leaders.map((student, idx) => {
             const h = hueFromString(student.name);
@@ -44,12 +40,12 @@ export default function TeacherLeaderboardPage() {
             return (
               <div 
                 key={student._id} 
-                className={`flex items-center gap-4 p-4 rounded-xl border ${isTop3 ? 'border-[var(--accent-amber)]/30 bg-[var(--accent-amber)]/5' : 'border-[var(--border-subtle)] bg-[var(--bg-surface)]'}`}
+                className={`flex items-center gap-4 rounded-lg border p-4 ${isTop3 ? 'border-[var(--accent-amber)]/30 bg-[var(--accent-amber)]/8' : 'border-[var(--border-subtle)] bg-[var(--bg-surface)]'}`}
               >
                 <div className="w-8 text-center font-mono font-bold text-[var(--text-muted)]">
-                  {idx === 0 ? <Trophy className="w-6 h-6 text-yellow-500 mx-auto" /> : 
-                   idx === 1 ? <Medal className="w-6 h-6 text-gray-400 mx-auto" /> : 
-                   idx === 2 ? <Medal className="w-6 h-6 text-amber-600 mx-auto" /> : 
+                  {idx === 0 ? <Trophy className="mx-auto h-6 w-6 text-[var(--accent-amber)]" /> : 
+                   idx === 1 ? <Medal className="mx-auto h-6 w-6 text-[var(--text-muted)]" /> : 
+                   idx === 2 ? <Medal className="mx-auto h-6 w-6 text-[var(--accent-secondary)]" /> : 
                    `#${idx + 1}`}
                 </div>
                 <div
@@ -59,10 +55,10 @@ export default function TeacherLeaderboardPage() {
                   {student.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="flex-1">
-                  <p className={`font-semibold ${isTop3 ? 'text-[var(--text-primary)]' : 'text-[var(--text-primary)]'}`}>{student.name}</p>
+                  <p className="font-semibold text-[var(--text-primary)]">{student.name}</p>
                 </div>
                 <div className="flex items-center gap-2 font-mono text-[var(--accent-amber)] font-semibold">
-                  {student.totalPoints} <Star className="w-4 h-4 fill-[var(--accent-amber)]" />
+                  {student.totalPoints} <Star className="h-4 w-4 fill-[var(--accent-amber)]" />
                 </div>
               </div>
             );
@@ -72,6 +68,6 @@ export default function TeacherLeaderboardPage() {
           )}
         </div>
       </Card>
-    </main>
+    </TeacherPageShell>
   );
 }

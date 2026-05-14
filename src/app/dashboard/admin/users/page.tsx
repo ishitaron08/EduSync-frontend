@@ -1,7 +1,11 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowRight, ShieldCheck, UserPlus } from "lucide-react";
 import { useDashboardGuard } from "@/lib/authGuard";
+import { AdminPageShell } from "@/components/admin/AdminPageShell";
 import { UsersTab } from "@/components/admin/dashboard/tabs/UsersTab";
+import { Button } from "@/components/ui/button";
 
 export default function AdminUsersPage() {
   const allowed = useDashboardGuard("admin");
@@ -15,8 +19,26 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <main className="mx-auto max-w-[1600px] px-4 py-6 md:px-6 lg:px-8">
+    <AdminPageShell
+      actions={
+        <>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/dashboard/admin/sections">
+              <ShieldCheck className="h-4 w-4" />
+              Sections
+            </Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/dashboard/admin/attendance">
+              <UserPlus className="h-4 w-4" />
+              Attendance
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </>
+      }
+    >
       <UsersTab />
-    </main>
+    </AdminPageShell>
   );
 }

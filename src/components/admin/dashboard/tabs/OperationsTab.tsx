@@ -208,11 +208,7 @@ export function OperationsTab() {
   const error = logsQuery.error ? describeApiError(logsQuery.error) : null;
 
   return (
-    <TabChrome
-      eyebrow="Operations"
-      title="Operational console"
-      description="Audit logs, timetable creation, and system health all live here."
-    >
+    <TabChrome>
       <div className="space-y-6">
         <TimetableBuilderStub />
         <SystemHealth />
@@ -232,7 +228,7 @@ export function OperationsTab() {
               {logs.map((log) => {
                 const actionFormatted = formatAction(log.action);
                 return (
-                  <div key={log._id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 hover:border-[var(--accent-primary)]/30 transition-colors">
+                  <div key={log._id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 hover:border-[var(--accent-primary)]/30 transition-colors">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       {/* Left side: Time and Action */}
                       <div className="flex items-center gap-4">

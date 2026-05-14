@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useQuery } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { hueFromString } from "@/lib/hueFromString";
 import { Card } from "@/components/ui/card";
-import { Trophy, Medal, Award, TrendingUp, Target } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Award, Flame, Medal, Target, TrendingUp } from "lucide-react";
 
 type LeaderboardEntry = {
   studentId: string;
@@ -17,12 +17,32 @@ type LeaderboardEntry = {
   rewardPoints: number;
 };
 
+type StudentProfile = {
+  _id?: string;
+  learningGoal?: string;
+  rewardPoints?: number;
+  streak?: number;
+};
+
+const validScopes = ["weekly", "monthly", "all_time"] as const;
+type Scope = (typeof validScopes)[number];
+
+function getScope(value: string | null): Scope {
+  return validScopes.includes(value as Scope) ? (value as Scope) : "all_time";
+}
+
+function displayName(entry: LeaderboardEntry, isMe: boolean) {
+  if (isMe) return `${entry.name} (You)`;
+  return `${entry.name.split(" ").map((part) => part[0]).join(".")}.`;
+}
+
 export default function StudentLeaderboardPage() {
   const allowed = useDashboardGuard("student");
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [scope, setScope] = useState("all_time");
+  const scope = getScope(searchParams.get("scope"));
+
   const leaderboardQuery = useQuery({
     queryKey: queryKeys.student.leaderboard(scope),
     queryFn: async () => {
@@ -34,156 +54,112 @@ export default function StudentLeaderboardPage() {
   const profileQuery = useQuery({
     queryKey: queryKeys.student.profile,
     queryFn: async () => {
-      const { data } = await api.get("/student/profile");
+      const { data } = await api.get<StudentProfile>("/student/profile");
       return data;
     },
     enabled: allowed
   });
-  const leaderboard = leaderboardQuery.data ?? [];
+
+  const leaderboard = useMemo(() => leaderboardQuery.data ?? [], [leaderboardQuery.data]);
   const profile = profileQuery.data ?? null;
   const loading = leaderboardQuery.isLoading || profileQuery.isLoading;
-
-  useEffect(() => {
-    const urlScope = searchParams.get("scope");
-    if (urlScope === "weekly" || urlScope === "monthly" || urlScope === "all_time") {
-      setScope(urlScope);
-    }
-  }, [searchParams]);
+  const topThree = leaderboard.slice(0, 3);
 
   if (!allowed) {
-    return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
+    return (
+      <main className="p-6">
+        <div className="nc-skeleton h-10 w-48 rounded-lg" />
+      </main>
+    );
   }
 
   function handleScopeChange(nextScope: string) {
-    setScope(nextScope);
     const params = new URLSearchParams(searchParams.toString());
     params.set("scope", nextScope);
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }
 
-  // Find user's rank
-  let userRank = leaderboard.findIndex(entry => entry.studentId === profile?._id) + 1;
-  if (userRank === 0 && profile) {
-    userRank = leaderboard.length + Math.floor(Math.random() * 50) + 1; // Mock rank if not in top 100
-  }
-
   return (
-    <main className="mx-auto max-w-5xl px-4 py-6 md:px-6 space-y-8">
-      <div className="text-center mb-10 mt-4">
-        <div className="inline-block bg-yellow-100 p-4 rounded-full mb-4">
-          <Trophy className="w-10 h-10 text-yellow-600" />
-        </div>
-        <h1 className="font-[family-name:var(--font-fraunces)] text-4xl font-bold text-[var(--text-primary)]">Global Rankings</h1>
-        <p className="text-[var(--text-muted)] mt-2">See how you stack up against the best in the institution.</p>
-      </div>
+    <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 md:px-6 lg:px-8">
+      <Tabs value={scope} onValueChange={handleScopeChange}>
+        <TabsList variant="grid" className="max-w-md">
+          <TabsTrigger value="weekly" variant="grid">Weekly</TabsTrigger>
+          <TabsTrigger value="monthly" variant="grid">Monthly</TabsTrigger>
+          <TabsTrigger value="all_time" variant="grid">All Time</TabsTrigger>
+        </TabsList>
+      </Tabs>
 
-      <div className="flex justify-center mb-8">
-        <Tabs value={scope} onValueChange={handleScopeChange} className="w-full max-w-[400px]">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="weekly">Weekly</TabsTrigger>
-            <TabsTrigger value="monthly">Monthly</TabsTrigger>
-            <TabsTrigger value="all_time">All Time</TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      <div className="grid gap-8 lg:grid-cols-12">
-        <div className="lg:col-span-4 space-y-6">
-          {/* Sticky self rank card */}
-          <Card className="p-6 sticky top-24 border-[var(--accent-primary)] shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-            <div className="text-center mb-6">
-              <p className="text-sm uppercase tracking-widest text-[var(--text-muted)] font-bold mb-1">Your Standing</p>
-              <div className="flex justify-center items-end gap-1">
-                <span className="text-5xl font-[family-name:var(--font-fraunces)] font-black text-[var(--accent-primary)]">#{userRank}</span>
+      <section className="grid gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <div className="space-y-4">
+          <Card className="p-5">
+            <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Profile score</p>
+            <div className="mt-5 space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><Target className="h-4 w-4" /> Goal</span>
+                <span className="text-right text-sm font-medium text-[var(--text-primary)]">{profile?.learningGoal || "Not set"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><Award className="h-4 w-4" /> Points</span>
+                <span className="font-semibold text-[var(--text-primary)]">{profile?.rewardPoints || 0}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><Flame className="h-4 w-4" /> Streak</span>
+                <span className="font-semibold text-[var(--accent-amber)]">{profile?.streak || 0} days</span>
               </div>
             </div>
-            
-            <div className="space-y-4 pt-6 border-t border-[var(--border-subtle)]">
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-[var(--text-muted)] flex items-center gap-2"><Target className="w-4 h-4"/> Goal</span>
-                <span className="font-medium">{profile?.learningGoal || "Not Set"}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-[var(--text-muted)] flex items-center gap-2"><Award className="w-4 h-4"/> Total Points</span>
-                <span className="font-bold text-[var(--text-primary)]">{profile?.rewardPoints || 0}</span>
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-[var(--text-muted)] flex items-center gap-2"><TrendingUp className="w-4 h-4"/> Current Streak</span>
-                <span className="font-bold text-orange-500">{profile?.streak || 0} 🔥</span>
-              </div>
-            </div>
+          </Card>
 
-            <div className="mt-8 bg-[var(--bg-elevated)] p-4 rounded-xl border border-dashed border-[var(--border-subtle)] text-center">
-              <p className="text-xs text-[var(--text-muted)]">Complete 3 more AI Tasks to reach the next tier!</p>
-            </div>
+          <Card className="p-5">
+            <TrendingUp className="mb-4 h-5 w-5 text-[var(--accent-primary)]" />
+            <p className="font-semibold text-[var(--text-primary)]">Next move</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Complete AI learning tasks and assessments to add points. Streaks help keep the climb steady.</p>
           </Card>
         </div>
 
-        <div className="lg:col-span-8">
-          <Card className="overflow-hidden">
-            <div className="p-4 bg-[var(--bg-elevated)] border-b border-[var(--border-subtle)] flex items-center justify-between">
-              <h3 className="font-semibold text-[var(--text-primary)]">Top Students</h3>
-              <span className="text-xs text-[var(--text-muted)]">Showing top {Math.min(leaderboard.length, 50)}</span>
-            </div>
-            
-            {loading ? (
-              <div className="p-8 text-center text-[var(--text-muted)]">Loading rankings...</div>
-            ) : (
-              <div className="divide-y divide-[var(--border-subtle)]">
-                {leaderboard.map((entry, idx) => {
-                  const rank = idx + 1;
-                  const h = hueFromString(entry.name);
-                  const isMe = entry.studentId === profile?._id;
-                  
-                  // Anonymize names if not self
-                  const displayName = isMe ? entry.name : entry.name.split(' ').map(n => n[0]).join('.') + '.';
+        <Card className="overflow-hidden p-0">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-5 py-4">
+            <h2 className="font-semibold text-[var(--text-primary)]">Top students</h2>
+            <span className="text-xs text-[var(--text-muted)]">{leaderboard.length} ranked</span>
+          </div>
 
-                  return (
-                    <div 
-                      key={entry.studentId} 
-                      className={`flex items-center p-4 transition-colors ${
-                        isMe ? 'bg-[var(--accent-primary)]/5 border-l-4 border-l-[var(--accent-primary)]' : 'hover:bg-[var(--bg-elevated)]'
-                      }`}
-                    >
-                      <div className="w-12 text-center flex justify-center">
-                        {rank === 1 ? <Medal className="w-6 h-6 text-yellow-500" /> :
-                         rank === 2 ? <Medal className="w-6 h-6 text-gray-400" /> :
-                         rank === 3 ? <Medal className="w-6 h-6 text-amber-700" /> :
-                         <span className="font-mono font-medium text-[var(--text-muted)]">#{rank}</span>}
+          {loading ? (
+            <div className="space-y-3 p-5">
+              {[1, 2, 3, 4].map((item) => <div key={item} className="nc-skeleton h-16 rounded-lg" />)}
+            </div>
+          ) : leaderboard.length ? (
+            <div className="divide-y divide-[var(--border-subtle)]">
+              {leaderboard.map((entry, index) => {
+                const rank = index + 1;
+                const isMe = entry.studentId === profile?._id;
+                const h = hueFromString(entry.name);
+                const isPodium = rank <= 3;
+                return (
+                  <div key={entry.studentId} className={`grid grid-cols-[48px_minmax(0,1fr)_auto] items-center gap-4 p-4 ${isMe ? "bg-[var(--accent-primary)]/8" : ""}`}>
+                    <div className="flex justify-center">
+                      {isPodium ? <Medal className={`h-6 w-6 ${rank === 1 ? "text-[var(--accent-amber)]" : rank === 2 ? "text-[var(--text-muted)]" : "text-[var(--accent-secondary)]"}`} /> : <span className="font-mono text-sm text-[var(--text-muted)]">#{rank}</span>}
+                    </div>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg font-semibold text-[var(--text-inverse)]" style={{ backgroundColor: `hsl(${h} 45% 42%)` }}>
+                        {entry.name.charAt(0).toUpperCase()}
                       </div>
-                      
-                      <div className="flex-1 flex items-center gap-3 ml-4">
-                        <div 
-                          className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white shadow-sm"
-                          style={{ backgroundColor: `hsl(${h} 55% 52%)` }}
-                        >
-                          {entry.name.charAt(0).toUpperCase()}
-                        </div>
-                        <div>
-                          <p className={`font-semibold ${isMe ? 'text-[var(--accent-primary)]' : 'text-[var(--text-primary)]'}`}>
-                            {displayName} {isMe && "(You)"}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="text-right">
-                        <p className="font-[family-name:var(--font-fraunces)] text-lg font-bold text-[var(--text-primary)]">{entry.rewardPoints}</p>
-                        <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Points</p>
+                      <div className="min-w-0">
+                        <p className={`truncate font-semibold ${isMe ? "text-[var(--accent-primary)]" : "text-[var(--text-primary)]"}`}>{displayName(entry, isMe)}</p>
+                        {topThree.some((top) => top.studentId === entry.studentId) ? <p className="text-xs text-[var(--text-muted)]">Podium rank</p> : null}
                       </div>
                     </div>
-                  );
-                })}
-
-                {leaderboard.length === 0 && (
-                  <div className="p-8 text-center text-[var(--text-muted)] border-dashed">
-                    No leaderboard data available yet.
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-[var(--text-primary)]">{entry.rewardPoints}</p>
+                      <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Points</p>
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
-          </Card>
-        </div>
-      </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="p-10 text-center text-sm text-[var(--text-muted)]">No leaderboard data available yet.</div>
+          )}
+        </Card>
+      </section>
     </main>
   );
 }

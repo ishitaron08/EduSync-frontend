@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Download } from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TeacherPageShell } from "@/components/teacher/TeacherPageShell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -23,6 +25,8 @@ type TestAnalytics = {
   stdDev: number;
   questionAccuracy: { questionIndex: number; prompt: string; accuracy: number }[];
 };
+
+const EMPTY_TESTS: TestRecord[] = [];
 
 export default function TeacherAnalyticsPage() {
   const allowed = useDashboardGuard("teacher");
@@ -47,9 +51,10 @@ export default function TeacherAnalyticsPage() {
     },
     enabled: allowed && Boolean(selectedTest)
   });
-  const tests = testsQuery.data ?? [];
+  const tests = testsQuery.data ?? EMPTY_TESTS;
   const analytics = analyticsQuery.data ?? null;
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const urlTest = searchParams.get("test");
     if (urlTest && tests.some(test => test._id === urlTest)) {
@@ -63,6 +68,7 @@ export default function TeacherAnalyticsPage() {
     const queryError = testsQuery.error ?? analyticsQuery.error;
     if (queryError) setLoadErr(describeApiError(queryError));
   }, [analyticsQuery.error, testsQuery.error]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!allowed) return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
 
@@ -76,7 +82,7 @@ export default function TeacherAnalyticsPage() {
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
-    } catch (e) {
+    } catch {
       setLoadErr("Failed to export data");
     }
   };
@@ -89,13 +95,9 @@ export default function TeacherAnalyticsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
-      <div className="mb-6 flex flex-wrap justify-between items-end gap-4">
-        <div>
-          <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">Test Analytics</h1>
-          <p className="text-sm text-[var(--text-muted)]">View performance trends and question-wise accuracy.</p>
-        </div>
-        <div className="flex gap-4 items-center">
+    <TeacherPageShell
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
           <Select value={selectedTest} onValueChange={handleSelectTest}>
             <SelectTrigger className="w-full sm:w-[250px]">
               <SelectValue placeholder="Select a test" />
@@ -107,10 +109,12 @@ export default function TeacherAnalyticsPage() {
             </SelectContent>
           </Select>
           <Button onClick={handleExport} disabled={!selectedTest} variant="outline">
+            <Download className="h-4 w-4" />
             Export CSV
           </Button>
         </div>
-      </div>
+      }
+    >
 
       {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)]">{loadErr}</p>}
 
@@ -158,6 +162,6 @@ export default function TeacherAnalyticsPage() {
           )}
         </div>
       )}
-    </main>
+    </TeacherPageShell>
   );
 }

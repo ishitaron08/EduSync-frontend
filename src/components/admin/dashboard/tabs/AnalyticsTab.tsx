@@ -31,11 +31,7 @@ export function AnalyticsTab() {
   const error = analyticsQuery.error ? describeApiError(analyticsQuery.error) : null;
 
   return (
-    <TabChrome
-      eyebrow="Learning Analytics"
-      title="AI & Goal Metrics"
-      description="Monitor AI learning module usage, task completion rates, and identify at-risk students."
-    >
+    <TabChrome>
       <DataState
         status={status}
         error={error}
@@ -104,7 +100,7 @@ export function AnalyticsTab() {
             <div className="grid gap-3 md:hidden">
               {data?.decliningStudents?.length ? (
                 data.decliningStudents.map((student) => (
-                  <div key={student._id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+                  <div key={student._id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="break-words font-medium text-[var(--text-primary)]">{student.name}</p>
@@ -116,11 +112,11 @@ export function AnalyticsTab() {
                   </div>
                 ))
               ) : (
-                <div className="rounded-2xl border border-dashed border-[var(--border-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">No students currently need intervention.</div>
+                <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-6 text-center text-sm text-[var(--text-muted)]">No students currently need intervention.</div>
               )}
             </div>
 
-            <div className="hidden rounded-2xl border border-[var(--border-subtle)] md:block">
+            <div className="hidden rounded-lg border border-[var(--border-subtle)] md:block">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)]">
                   <tr>

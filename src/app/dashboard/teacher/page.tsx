@@ -1,15 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
+import { ArrowRight, Calendar, ClipboardCheck, ScanLine } from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
-import { Card } from "@/components/ui/card";
 import { hueFromString } from "@/lib/hueFromString";
-import { Calendar, ScanLine, ClipboardCheck } from "lucide-react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { TeacherPageShell } from "@/components/teacher/TeacherPageShell";
 
 type PerfStudent = { _id: string; name: string; email: string; rewardPoints?: number };
 
@@ -29,99 +30,130 @@ export default function TeacherDashboardPage() {
   if (!allowed) {
     return (
       <main className="p-6">
-        <div className="nc-skeleton h-10 w-48 rounded-[8px]" />
+        <div className="nc-skeleton h-10 w-48 rounded-lg" />
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 md:px-6">
-      <div className="mb-6">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">Teacher Dashboard</h1>
-        <p className="text-sm text-[var(--text-muted)]">Today's agenda, quick actions, and student performance overview.</p>
-      </div>
+    <TeacherPageShell
+      actions={
+        <>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/dashboard/teacher/timetable">
+              <Calendar className="h-4 w-4" />
+              Timetable
+            </Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/dashboard/teacher/attendance">
+              <ScanLine className="h-4 w-4" />
+              Attendance
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </>
+      }
+    >
 
-      {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)]">{loadErr}</p>}
+      {loadErr && (
+        <div className="rounded-lg border border-[var(--accent-danger)]/25 bg-[var(--accent-danger)]/8 px-3 py-2 text-sm text-[var(--accent-danger)]">
+          {loadErr}
+        </div>
+      )}
 
-      <div className="grid gap-6 md:grid-cols-3 mb-8">
-        <Card className="p-5 flex flex-col gap-4">
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="flex flex-col gap-4 p-5">
           <div className="flex items-center gap-3">
-            <div className="bg-[var(--accent-primary)]/10 p-2 rounded-lg">
-              <Calendar className="w-6 h-6 text-[var(--accent-primary)]" />
+            <div className="rounded-lg bg-[var(--accent-primary)]/10 p-2">
+              <Calendar className="h-5 w-5 text-[var(--accent-primary)]" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Today's Schedule</p>
-              <p className="font-semibold text-[var(--text-primary)]">3 Classes</p>
+              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Today schedule</p>
+              <p className="font-semibold text-[var(--text-primary)]">3 classes</p>
             </div>
           </div>
-          <Button asChild variant="ghost" className="w-full justify-start text-sm mt-auto">
-            <Link href="/dashboard/teacher/timetable">View Timetable &rarr;</Link>
+          <Button asChild variant="ghost" className="mt-auto w-full justify-between text-sm">
+            <Link href="/dashboard/teacher/timetable">View Timetable <ArrowRight className="h-4 w-4" /></Link>
           </Button>
         </Card>
 
-        <Card className="p-5 flex flex-col gap-4">
+        <Card className="flex flex-col gap-4 p-5">
           <div className="flex items-center gap-3">
-            <div className="bg-[var(--accent-secondary)]/10 p-2 rounded-lg">
-              <ScanLine className="w-6 h-6 text-[var(--accent-secondary)]" />
+            <div className="rounded-lg bg-[var(--accent-secondary)]/10 p-2">
+              <ScanLine className="h-5 w-5 text-[var(--accent-secondary)]" />
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Attendance</p>
               <p className="font-semibold text-[var(--text-primary)]">Needs action</p>
             </div>
           </div>
-          <Button asChild variant="ghost" className="w-full justify-start text-sm mt-auto">
-            <Link href="/dashboard/teacher/attendance">Generate QR Code &rarr;</Link>
+          <Button asChild variant="ghost" className="mt-auto w-full justify-between text-sm">
+            <Link href="/dashboard/teacher/attendance">Generate QR Code <ArrowRight className="h-4 w-4" /></Link>
           </Button>
         </Card>
 
-        <Card className="p-5 flex flex-col gap-4">
+        <Card className="flex flex-col gap-4 p-5">
           <div className="flex items-center gap-3">
-            <div className="bg-[var(--accent-amber)]/10 p-2 rounded-lg">
-              <ClipboardCheck className="w-6 h-6 text-[var(--accent-amber)]" />
+            <div className="rounded-lg bg-[var(--accent-amber)]/10 p-2">
+              <ClipboardCheck className="h-5 w-5 text-[var(--accent-amber)]" />
             </div>
             <div>
               <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Recent Tests</p>
-              <p className="font-semibold text-[var(--text-primary)]">2 Active</p>
+              <p className="font-semibold text-[var(--text-primary)]">2 active</p>
             </div>
           </div>
-          <Button asChild variant="ghost" className="w-full justify-start text-sm mt-auto">
-            <Link href="/dashboard/teacher/tests">Manage Tests &rarr;</Link>
+          <Button asChild variant="ghost" className="mt-auto w-full justify-between text-sm">
+            <Link href="/dashboard/teacher/tests">Manage Tests <ArrowRight className="h-4 w-4" /></Link>
           </Button>
         </Card>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-2">
-        <section>
-          <Card className="p-5">
-            <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)] mb-4">Top Performers in Your Classes</p>
-            <div className="space-y-4">
-              {perf.slice(0, 5).map((s) => {
-                const h = hueFromString(s.name);
-                const spark = [20, 35, 28, 40, 32, 45, 38];
-                return (
-                  <div key={s._id} className="flex gap-3 border-b border-[var(--border-subtle)] pb-3 last:border-0">
-                    <div
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[var(--border-subtle)] font-mono text-xs text-[var(--accent-secondary)]"
-                      style={{ borderColor: `hsl(${h} 40% 40%)` }}
-                    >
-                      {(s.rewardPoints ?? 0) % 100}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-[var(--text-primary)]">{s.name}</p>
-                      <div className="mt-1 flex items-end gap-1">
-                        {spark.map((v, i) => (
-                          <div key={i} className="w-1 rounded-sm bg-[var(--accent-secondary)]" style={{ height: `${v / 3}px` }} />
-                        ))}
-                      </div>
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <Card className="p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Top performers in your classes</p>
+            <span className="text-xs text-[var(--text-muted)]">{perf.length} students</span>
+          </div>
+          <div className="space-y-3">
+            {perf.slice(0, 5).map((student) => {
+              const h = hueFromString(student.name);
+              const spark = [20, 35, 28, 40, 32, 45, 38];
+              return (
+                <div key={student._id} className="flex gap-3 border-b border-[var(--border-subtle)] pb-3 last:border-0 last:pb-0">
+                  <div
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-[var(--bg-elevated)] font-mono text-xs text-[var(--accent-secondary)]"
+                    style={{ borderColor: `hsl(${h} 40% 40%)` }}
+                  >
+                    {(student.rewardPoints ?? 0) % 100}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-[var(--text-primary)]">{student.name}</p>
+                    <p className="truncate text-xs text-[var(--text-muted)]">{student.email}</p>
+                    <div className="mt-2 flex h-4 items-end gap-1">
+                      {spark.map((value, index) => (
+                        <div key={index} className="w-1 rounded-sm bg-[var(--accent-secondary)]/70" style={{ height: `${value / 3}px` }} />
+                      ))}
                     </div>
                   </div>
-                );
-              })}
-              {perf.length === 0 && <p className="text-sm text-[var(--text-muted)]">No performance data yet.</p>}
-            </div>
-          </Card>
-        </section>
-      </div>
-    </main>
+                </div>
+              );
+            })}
+            {perf.length === 0 && <p className="text-sm text-[var(--text-muted)]">No performance data yet.</p>}
+          </div>
+        </Card>
+
+        <Card className="flex flex-col justify-between gap-4 p-5">
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Today focus</p>
+            <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">Review attendance before the next class starts.</p>
+            <p className="mt-2 text-sm text-[var(--text-muted)]">This keeps student records current and avoids end-of-day reconciliation.</p>
+          </div>
+          <Button asChild>
+            <Link href="/dashboard/teacher/attendance">Open attendance</Link>
+          </Button>
+        </Card>
+      </section>
+    </TeacherPageShell>
   );
 }

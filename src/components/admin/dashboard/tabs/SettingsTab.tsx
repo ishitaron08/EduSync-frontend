@@ -2,7 +2,6 @@
 
 import { useEffect, useState, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -50,9 +49,11 @@ export function SettingsTab() {
   const error = settingsQuery.error ? describeApiError(settingsQuery.error) : null;
   const saving = saveSettingsMutation.isPending;
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (settingsQuery.data) setSettings(settingsQuery.data);
   }, [settingsQuery.data]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
@@ -66,11 +67,7 @@ export function SettingsTab() {
   }
 
   return (
-    <TabChrome
-      eyebrow="Settings"
-      title="System configuration"
-      description="Manage institution parameters, point multipliers, and the academic calendar."
-    >
+    <TabChrome>
       <DataState status={status} error={error} loading="Loading settings...">
         <form onSubmit={handleSave} className="grid gap-6 xl:grid-cols-12">
           <div className="space-y-6 xl:col-span-8">
@@ -118,7 +115,7 @@ export function SettingsTab() {
 
             <div className="flex justify-end pt-2">
               <Button type="submit" variant="filled" disabled={saving}>
-                {saving ? "Saving..." : "Save Settings"}
+                {saving ? "Saving..." : "Save settings"}
               </Button>
             </div>
           </div>

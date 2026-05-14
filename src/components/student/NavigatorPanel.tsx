@@ -102,7 +102,7 @@ export function NavigatorPanel() {
   }, [category, visible]);
 
   return (
-    <div className="sticky top-4 rounded-[8px] border-l-4 border-[var(--accent-secondary)] bg-[var(--bg-surface)] p-4 shadow-[var(--glow-blue)]">
+    <div className="sticky top-4 rounded-lg border border-[var(--accent-secondary)]/30 bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-soft)]">
       <div className="flex items-center gap-2">
         <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[var(--accent-secondary)]/40 bg-[var(--bg-elevated)] text-xs">
           AI

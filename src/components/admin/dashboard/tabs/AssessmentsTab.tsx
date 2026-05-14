@@ -33,11 +33,7 @@ export function AssessmentsTab() {
   const error = assessmentsQuery.error ? describeApiError(assessmentsQuery.error) : null;
 
   return (
-    <TabChrome
-      eyebrow="Assessments"
-      title="Assessment review"
-      description="Browse live assessment records and track attempt counts from the backend."
-    >
+    <TabChrome>
       <DataState
         status={status}
         error={error}
@@ -53,7 +49,7 @@ export function AssessmentsTab() {
         <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Assessments</p>
         <div className="mt-4 grid gap-3 md:hidden">
           {assessments.map((assessment) => (
-            <div key={assessment._id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+            <div key={assessment._id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="break-words font-medium text-[var(--text-primary)]">{assessment.title}</p>
@@ -75,7 +71,7 @@ export function AssessmentsTab() {
           ))}
         </div>
 
-        <div className="mt-4 hidden rounded-2xl border border-[var(--border-subtle)] md:block">
+        <div className="mt-4 hidden rounded-lg border border-[var(--border-subtle)] md:block">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)]">
               <tr>

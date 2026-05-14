@@ -65,16 +65,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={200}>
-    {/* Full-viewport row. overflow-hidden here prevents the wrapper itself from scrolling. */}
     <div className="relative flex h-full min-w-0 flex-1 overflow-hidden bg-[var(--bg-primary)]">
-      {/* Sidebar: fixed height = viewport, never scrolls with content */}
       <AppSidebar expanded={expanded} className="hidden md:flex" />
       {mobileNavOpen && (
         <div className="fixed inset-0 z-40 md:hidden" role="presentation">
           <button
             type="button"
             aria-label="Close navigation"
-            className="absolute inset-0 bg-black/40"
+            className="absolute inset-0 bg-[oklch(22%_0.035_246_/_0.42)]"
             onClick={() => setMobileNavOpen(false)}
           />
           <AppSidebar
@@ -85,19 +83,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           />
         </div>
       )}
-      {/* Content column: this is the ONLY thing that scrolls */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-2 py-1.5 md:hidden">
+        <div className="sticky top-0 z-30 flex items-center gap-2 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 md:hidden">
           <Button type="button" variant="ghost" className="h-10 w-10 p-0" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
             <PanelLeftOpen className="h-5 w-5" />
           </Button>
-          <Link href="/" className="font-[family-name:var(--font-fraunces)] text-sm font-semibold text-[var(--text-primary)]">
+          <Link href="/" className="text-sm font-semibold text-[var(--text-primary)]">
             EduSync
           </Link>
         </div>
-        <TopBar expanded={expanded} onToggleSidebar={() => setExpanded((e) => !e)} />
-        {/* Page content scrolls here — sidebar stays put */}
-        <div className="nc-page-enter flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-[var(--bg-primary)]">{children}</div>
+        <TopBar expanded={expanded} onToggleSidebar={() => setExpanded((e) => !e)} />        <div className="nc-page-enter flex min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-[var(--bg-primary)]">{children}</div>
       </div>
     </div>
     </TooltipProvider>

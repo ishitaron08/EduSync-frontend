@@ -1,7 +1,11 @@
 "use client";
 
+import Link from "next/link";
+import { ArrowRight, CalendarDays, UsersRound } from "lucide-react";
 import { useDashboardGuard } from "@/lib/authGuard";
+import { AdminPageShell } from "@/components/admin/AdminPageShell";
 import { OverviewTab } from "@/components/admin/dashboard/tabs/OverviewTab";
+import { Button } from "@/components/ui/button";
 
 export default function AdminDashboardPage() {
   const allowed = useDashboardGuard("admin");
@@ -15,8 +19,26 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <main className="mx-auto min-h-full max-w-[1600px] px-4 py-6 md:px-6 lg:px-8">
+    <AdminPageShell
+      actions={
+        <>
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/dashboard/admin/users">
+              <UsersRound className="h-4 w-4" />
+              Users
+            </Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link href="/dashboard/admin/timetable">
+              <CalendarDays className="h-4 w-4" />
+              Timetable
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </Button>
+        </>
+      }
+    >
       <OverviewTab />
-    </main>
+    </AdminPageShell>
   );
 }

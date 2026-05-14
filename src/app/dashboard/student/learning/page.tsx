@@ -1,13 +1,33 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowRight,
+  BookOpen,
+  Briefcase,
+  CheckCircle2,
+  Clock3,
+  Code,
+  Loader2,
+  Medal,
+  Sparkles,
+  WandSparkles
+} from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
-import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Target, BookOpen, Briefcase, Code, Sparkles, CheckCircle2, Loader2, ArrowRight } from "lucide-react";
-import { useSearchParams } from "next/navigation";
+import { Card } from "@/components/ui/card";
+
+type StudentProfile = {
+  learningGoal?: string | null;
+  rewardPoints?: number;
+  streak?: number;
+};
 
 type TaskRecommendation = {
   title: string;
@@ -21,240 +41,336 @@ type TaskRecommendation = {
 type ActiveTask = {
   _id: string;
   title: string;
+  category?: string;
+  difficulty?: string;
   status: string;
+  durationMinutes?: number;
+  basePoints?: number;
   pointsAwarded?: number;
 };
+
+const goalOptions = [
+  {
+    title: "Academic Improvement",
+    detail: "Strengthen current subjects with targeted practice.",
+    icon: BookOpen,
+    tone: "primary"
+  },
+  {
+    title: "Placement Preparation",
+    detail: "Build aptitude, interview, and readiness habits.",
+    icon: Briefcase,
+    tone: "amber"
+  },
+  {
+    title: "Skill Development",
+    detail: "Learn technologies, frameworks, and project skills.",
+    icon: Code,
+    tone: "secondary"
+  }
+] as const;
+
+function difficultyTone(difficulty: TaskRecommendation["difficulty"] | string | undefined) {
+  if (difficulty === "Easy") return "bg-[var(--accent-success)]/12 text-[var(--accent-success)]";
+  if (difficulty === "Medium") return "bg-[var(--accent-amber)]/12 text-[var(--accent-amber)]";
+  return "bg-[var(--accent-danger)]/12 text-[var(--accent-danger)]";
+}
+
+function GoalCard({
+  title,
+  detail,
+  icon: Icon,
+  tone,
+  onSelect,
+  disabled
+}: {
+  title: string;
+  detail: string;
+  icon: typeof BookOpen;
+  tone: "primary" | "amber" | "secondary";
+  onSelect: () => void;
+  disabled: boolean;
+}) {
+  const toneClass =
+    tone === "amber"
+      ? "bg-[var(--accent-amber)]/12 text-[var(--accent-amber)]"
+      : tone === "secondary"
+        ? "bg-[var(--accent-secondary)]/10 text-[var(--accent-secondary)]"
+        : "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]";
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={disabled}
+      className="group rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 text-left shadow-[var(--shadow-soft)] transition-[border-color,box-shadow,transform] hover:border-[var(--accent-primary)]/35 hover:shadow-[var(--shadow-lift)] disabled:pointer-events-none disabled:opacity-55"
+    >
+      <div className={`mb-8 flex h-11 w-11 items-center justify-center rounded-lg ${toneClass}`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <h2 className="text-xl font-semibold text-[var(--text-primary)]">{title}</h2>
+      <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{detail}</p>
+      <span className="mt-6 inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-primary)]">
+        Select goal <ArrowRight className="h-4 w-4" />
+      </span>
+    </button>
+  );
+}
 
 export default function StudentLearningPage() {
   const allowed = useDashboardGuard("student");
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
   const requestedDuration = searchParams.get("duration") || "60";
-  
-  const [profile, setProfile] = useState<any>(null);
-  const [recommendations, setRecommendations] = useState<TaskRecommendation[]>([]);
-  const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const fetchState = async () => {
-    try {
-      const [profRes, tasksRes] = await Promise.all([
-        api.get("/student/profile"),
-        api.get("/student/tasks")
-      ]);
-      setProfile(profRes.data);
-      const pendingTasks = tasksRes.data.filter((t: any) => t.status !== "completed");
-      setActiveTasks(pendingTasks);
-      
-      if (profRes.data?.learningGoal && pendingTasks.length === 0) {
-        // Fetch recommendations if no active tasks
-        const recsRes = await api.get(`/student/tasks/recommendations?duration=${requestedDuration}`);
-        setRecommendations(recsRes.data);
-      }
-    } catch (err) {
-      setError(describeApiError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const profileQuery = useQuery({
+    queryKey: queryKeys.student.profile,
+    queryFn: async () => {
+      const { data } = await api.get<StudentProfile>("/student/profile");
+      return data;
+    },
+    enabled: allowed
+  });
 
-  useEffect(() => {
-    if (!allowed) return;
-    fetchState();
-  }, [allowed, requestedDuration]);
+  const tasksQuery = useQuery({
+    queryKey: queryKeys.student.tasks,
+    queryFn: async () => {
+      const { data } = await api.get<ActiveTask[]>("/student/tasks");
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: allowed
+  });
 
-  if (!allowed || loading) {
-    return <main className="p-6"><div className="flex items-center gap-2"><Loader2 className="animate-spin text-[var(--accent-primary)]" /> Loading AI Engine...</div></main>;
-  }
+  const profile = profileQuery.data ?? null;
+  const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
+  const activeTasks = useMemo(() => tasks.filter((task) => task.status !== "completed"), [tasks]);
+  const hasGoal = Boolean(profile?.learningGoal);
 
-  const handleSetGoal = async (goal: string) => {
-    try {
-      setLoading(true);
-      await api.patch("/student/profile", { learningGoal: goal });
-      await fetchState();
-    } catch (err) {
-      setError(describeApiError(err));
-      setLoading(false);
-    }
-  };
+  const recommendationsQuery = useQuery({
+    queryKey: ["student", "tasks", "recommendations", requestedDuration],
+    queryFn: async () => {
+      const { data } = await api.get<TaskRecommendation[]>(`/student/tasks/recommendations?duration=${requestedDuration}`);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: allowed && hasGoal && activeTasks.length === 0
+  });
 
-  const handleAcceptTask = async (rec: TaskRecommendation) => {
-    try {
-      setProcessingId(rec.title);
-      // Create task in DB
-      await api.post("/student/tasks", {
+  const goalMutation = useMutation({
+    mutationFn: (goal: string) => api.patch("/student/profile", { learningGoal: goal }),
+    onSuccess: async () => {
+      setLocalError(null);
+      await queryClient.invalidateQueries({ queryKey: queryKeys.student.profile });
+    },
+    onError: (err) => setLocalError(describeApiError(err))
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: (rec: TaskRecommendation) =>
+      api.post("/student/tasks", {
         title: rec.title,
         category: rec.category,
         difficulty: rec.difficulty,
         durationMinutes: rec.durationMinutes,
         basePoints: rec.basePoints
-      });
-      await fetchState();
-    } catch (err) {
-      setError(describeApiError(err));
-    } finally {
-      setProcessingId(null);
-    }
-  };
+      }),
+    onSuccess: async () => {
+      setLocalError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.student.tasks }),
+        queryClient.invalidateQueries({ queryKey: ["student", "tasks", "recommendations", requestedDuration] })
+      ]);
+    },
+    onError: (err) => setLocalError(describeApiError(err))
+  });
 
-  const handleCompleteTask = async (taskId: string) => {
-    try {
-      setProcessingId(taskId);
-      await api.patch(`/student/tasks/${taskId}/complete`);
-      await fetchState();
-    } catch (err) {
-      setError(describeApiError(err));
-    } finally {
-      setProcessingId(null);
-    }
-  };
+  const completeMutation = useMutation({
+    mutationFn: (taskId: string) => api.patch(`/student/tasks/${taskId}/complete`),
+    onSuccess: async () => {
+      setLocalError(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.student.tasks }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.student.profile })
+      ]);
+    },
+    onError: (err) => setLocalError(describeApiError(err))
+  });
 
-  // State 1: Goal Selection
-  if (!profile?.learningGoal) {
+  const loading = profileQuery.isLoading || tasksQuery.isLoading;
+  const error = localError ?? (profileQuery.error ? describeApiError(profileQuery.error) : null) ?? (tasksQuery.error ? describeApiError(tasksQuery.error) : null) ?? (recommendationsQuery.error ? describeApiError(recommendationsQuery.error) : null);
+  const recommendations = recommendationsQuery.data ?? [];
+
+  if (!allowed || loading) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-8">
-        <div className="text-center mb-8">
-          <div className="inline-block bg-[var(--accent-primary)]/10 p-3 rounded-full mb-4">
-            <Target className="w-8 h-8 text-[var(--accent-primary)]" />
-          </div>
-          <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">Set Your Learning Goal</h1>
-          <p className="text-[var(--text-muted)] mt-2 max-w-lg mx-auto">To personalize your AI recommendations, please select what you want to focus on this semester.</p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-3">
-          <Card className="p-6 flex flex-col gap-4 border-[var(--border-subtle)] hover:border-[var(--accent-primary)]/50 transition-colors cursor-pointer group" onClick={() => handleSetGoal("Academic Improvement")}>
-            <BookOpen className="w-8 h-8 text-[var(--accent-primary)] group-hover:scale-110 transition-transform" />
-            <div>
-              <h3 className="font-semibold text-lg text-[var(--text-primary)]">Academic Improvement</h3>
-              <p className="text-sm text-[var(--text-muted)] mt-1">Improve grades in current subjects and get subject-wise practice.</p>
-            </div>
-            <Button variant="ghost" className="mt-auto justify-between group-hover:bg-[var(--accent-primary)] group-hover:text-white">
-              Select Goal <ArrowRight className="w-4 h-4" />
-            </Button>
-          </Card>
-
-          <Card className="p-6 flex flex-col gap-4 border-[var(--border-subtle)] hover:border-[var(--accent-amber)]/50 transition-colors cursor-pointer group" onClick={() => handleSetGoal("Placement Preparation")}>
-            <Briefcase className="w-8 h-8 text-[var(--accent-amber)] group-hover:scale-110 transition-transform" />
-            <div>
-              <h3 className="font-semibold text-lg text-[var(--text-primary)]">Placement Preparation</h3>
-              <p className="text-sm text-[var(--text-muted)] mt-1">Prepare for campus placements with aptitude and interview tasks.</p>
-            </div>
-            <Button variant="ghost" className="mt-auto justify-between group-hover:bg-[var(--accent-amber)] group-hover:text-white">
-              Select Goal <ArrowRight className="w-4 h-4" />
-            </Button>
-          </Card>
-
-          <Card className="p-6 flex flex-col gap-4 border-[var(--border-subtle)] hover:border-[var(--accent-secondary)]/50 transition-colors cursor-pointer group" onClick={() => handleSetGoal("Skill Development")}>
-            <Code className="w-8 h-8 text-[var(--accent-secondary)] group-hover:scale-110 transition-transform" />
-            <div>
-              <h3 className="font-semibold text-lg text-[var(--text-primary)]">Skill Development</h3>
-              <p className="text-sm text-[var(--text-muted)] mt-1">Learn new technologies, frameworks, and build projects.</p>
-            </div>
-            <Button variant="ghost" className="mt-auto justify-between group-hover:bg-[var(--accent-secondary)] group-hover:text-white">
-              Select Goal <ArrowRight className="w-4 h-4" />
-            </Button>
-          </Card>
+      <main className="mx-auto w-full max-w-7xl p-6">
+        <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+          <Loader2 className="h-4 w-4 animate-spin text-[var(--accent-primary)]" />
+          Preparing learning workspace...
         </div>
       </main>
     );
   }
 
-  return (
-    <main className="mx-auto max-w-5xl px-4 py-6 md:px-6 space-y-8">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--border-subtle)] pb-4">
-        <div className="flex items-center gap-3">
-          <div className="bg-[var(--accent-primary)]/10 p-2 rounded-lg">
-            <Sparkles className="w-6 h-6 text-[var(--accent-primary)]" />
-          </div>
-          <div>
-            <h1 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold text-[var(--text-primary)]">
-              AI Smart Learning
-            </h1>
-            <p className="text-sm text-[var(--text-muted)]">Goal: <span className="font-medium text-[var(--text-primary)]">{profile.learningGoal}</span></p>
-          </div>
-        </div>
-      </header>
+  if (!hasGoal) {
+    return (
+      <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 md:px-6 lg:px-8">
+        {error ? (
+          <div className="rounded-lg border border-[var(--accent-danger)]/25 bg-[var(--accent-danger)]/8 p-3 text-sm text-[var(--accent-danger)]">{error}</div>
+        ) : null}
 
-      {error && <p className="text-sm text-[var(--accent-danger)] bg-[var(--accent-danger)]/10 p-3 rounded-md">{error}</p>}
+        <section className="grid gap-4 md:grid-cols-3">
+          {goalOptions.map((goal) => (
+            <GoalCard
+              key={goal.title}
+              title={goal.title}
+              detail={goal.detail}
+              icon={goal.icon}
+              tone={goal.tone}
+              onSelect={() => goalMutation.mutate(goal.title)}
+              disabled={goalMutation.isPending}
+            />
+          ))}
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 md:px-6 lg:px-8">
+      <section>
+        <Card className="p-5">
+          <div className="mb-5 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Current goal</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">{profile?.learningGoal}</h2>
+            </div>
+            <WandSparkles className="h-5 w-5 text-[var(--accent-primary)]" />
+          </div>
+          <p className="text-sm leading-6 text-[var(--text-muted)]">
+            Change the goal anytime by selecting a new direction below. The recommendation engine will adjust the next task set.
+          </p>
+          <div className="mt-5 grid gap-2">
+            {goalOptions.map((goal) => (
+              <Button
+                key={goal.title}
+                type="button"
+                variant={profile?.learningGoal === goal.title ? "filled" : "ghost"}
+                disabled={goalMutation.isPending}
+                onClick={() => goalMutation.mutate(goal.title)}
+                className="justify-start"
+              >
+                <goal.icon className="h-4 w-4" />
+                {goal.title}
+              </Button>
+            ))}
+          </div>
+        </Card>
+      </section>
+
+      {error ? (
+        <div className="rounded-lg border border-[var(--accent-danger)]/25 bg-[var(--accent-danger)]/8 p-3 text-sm text-[var(--accent-danger)]">{error}</div>
+      ) : null}
 
       {activeTasks.length > 0 ? (
-        <section>
-          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Your Active Tasks</h2>
+        <section className="space-y-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">In progress</p>
+            <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">Finish these tasks first</h2>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
-            {activeTasks.map(task => (
-              <Card key={task._id} className="p-6 border-[var(--accent-primary)] bg-[var(--accent-primary)]/5">
-                <div className="flex items-start justify-between mb-4">
+            {activeTasks.map((task) => (
+              <Card key={task._id} className="p-5">
+                <div className="mb-5 flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="font-semibold text-lg text-[var(--text-primary)]">{task.title}</h3>
-                    <p className="text-xs text-[var(--text-muted)] mt-1">Status: In Progress</p>
+                    <Badge tone="green">In progress</Badge>
+                    <h3 className="mt-3 text-xl font-semibold text-[var(--text-primary)]">{task.title}</h3>
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">{task.category ?? "Learning task"}</p>
                   </div>
-                  <div className="bg-white p-2 rounded-full shadow-sm">
-                    <Loader2 className="w-5 h-5 text-[var(--accent-primary)] animate-spin" />
-                  </div>
+                  <Sparkles className="h-5 w-5 text-[var(--accent-primary)]" />
                 </div>
-                <Button 
-                  onClick={() => handleCompleteTask(task._id)} 
-                  disabled={processingId === task._id}
-                  className="w-full gap-2" 
-                  variant="filled"
+                <div className="mb-5 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
+                  {task.durationMinutes ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-elevated)] px-2 py-1">
+                      <Clock3 className="h-3.5 w-3.5" />
+                      {task.durationMinutes} min
+                    </span>
+                  ) : null}
+                  {task.basePoints ? <span className="rounded-md bg-[var(--bg-elevated)] px-2 py-1">{task.basePoints} pts</span> : null}
+                </div>
+                <Button
+                  onClick={() => completeMutation.mutate(task._id)}
+                  disabled={completeMutation.isPending}
+                  className="w-full justify-between"
                 >
-                  {processingId === task._id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                  Mark Complete
+                  {completeMutation.isPending ? "Completing..." : "Mark complete"}
+                  <CheckCircle2 className="h-4 w-4" />
                 </Button>
               </Card>
             ))}
           </div>
         </section>
       ) : (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-[var(--text-primary)]">Recommended for You</h2>
-            <span className="text-xs font-mono bg-[var(--bg-elevated)] px-2 py-1 rounded text-[var(--text-muted)]">
-              Slot Time: {requestedDuration} min
-            </span>
+        <section id="recommendations" className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Recommended next</p>
+              <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">Pick a task for this slot</h2>
+            </div>
+            <Badge tone="muted">{requestedDuration} minute slot</Badge>
           </div>
-          
-          <div className="grid gap-6 lg:grid-cols-3">
-            {recommendations.map((rec, idx) => (
-              <Card key={idx} className="flex flex-col p-0 overflow-hidden border-[var(--border-subtle)] hover:shadow-lg transition-shadow">
-                <div className="p-5 flex-1">
-                  <div className="flex justify-between items-start mb-3">
-                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                      rec.difficulty === 'Easy' ? 'bg-green-100 text-green-700' :
-                      rec.difficulty === 'Medium' ? 'bg-amber-100 text-amber-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
-                      {rec.difficulty}
-                    </span>
-                    <span className="text-xs font-mono text-[var(--accent-primary)] bg-[var(--accent-primary)]/10 px-2 py-1 rounded">
-                      {(rec.probability * 100).toFixed(0)}% Match
-                    </span>
+
+          {recommendationsQuery.isLoading ? (
+            <div className="grid gap-4 lg:grid-cols-3">
+              {[1, 2, 3].map((item) => (
+                <div key={item} className="nc-skeleton h-56 rounded-lg" />
+              ))}
+            </div>
+          ) : recommendations.length ? (
+            <div className="grid gap-4 lg:grid-cols-3">
+              {recommendations.map((rec) => (
+                <Card key={rec.title} className="flex flex-col p-0">
+                  <div className="flex-1 p-5">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${difficultyTone(rec.difficulty)}`}>{rec.difficulty}</span>
+                      <span className="rounded-full bg-[var(--accent-primary)]/10 px-2.5 py-1 font-mono text-xs text-[var(--accent-primary)]">
+                        {(rec.probability * 100).toFixed(0)}% match
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-semibold leading-tight text-[var(--text-primary)]">{rec.title}</h3>
+                    <p className="mt-2 text-sm text-[var(--text-muted)]">{rec.category}</p>
+                    <div className="mt-5 grid grid-cols-2 gap-2 text-sm">
+                      <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                        <Clock3 className="mb-2 h-4 w-4 text-[var(--accent-primary)]" />
+                        <p className="font-semibold text-[var(--text-primary)]">{rec.durationMinutes} min</p>
+                        <p className="text-xs text-[var(--text-muted)]">Estimate</p>
+                      </div>
+                      <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                        <Medal className="mb-2 h-4 w-4 text-[var(--accent-amber)]" />
+                        <p className="font-semibold text-[var(--text-primary)]">{rec.basePoints} pts</p>
+                        <p className="text-xs text-[var(--text-muted)]">Reward</p>
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="font-semibold text-[var(--text-primary)] text-lg leading-tight mb-2">{rec.title}</h3>
-                  <div className="text-sm text-[var(--text-muted)] space-y-1">
-                    <p>Est. time: {rec.durationMinutes} min</p>
-                    <p>Reward: {rec.basePoints} points</p>
+                  <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-primary)] p-3">
+                    <Button
+                      onClick={() => acceptMutation.mutate(rec)}
+                      disabled={acceptMutation.isPending}
+                      className="w-full justify-between"
+                    >
+                      {acceptMutation.isPending ? "Accepting..." : "Accept task"}
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
                   </div>
-                </div>
-                <div className="p-3 bg-[var(--bg-elevated)] border-t border-[var(--border-subtle)]">
-                  <Button 
-                    onClick={() => handleAcceptTask(rec)} 
-                    disabled={processingId === rec.title}
-                    variant="default" 
-                    className="w-full"
-                  >
-                    {processingId === rec.title ? <Loader2 className="w-4 h-4 animate-spin" /> : "Accept Task"}
-                  </Button>
-                </div>
-              </Card>
-            ))}
-            {recommendations.length === 0 && (
-              <div className="col-span-3 text-center py-12 text-[var(--text-muted)] bg-[var(--bg-elevated)] rounded-xl border border-dashed border-[var(--border-subtle)]">
-                No recommendations found for a {requestedDuration} minute slot.
-              </div>
-            )}
-          </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-primary)] p-10 text-center">
+              <Sparkles className="mx-auto mb-3 h-8 w-8 text-[var(--accent-primary)]" />
+              <p className="font-semibold text-[var(--text-primary)]">No recommendations for this slot</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">Try a longer free window from your timetable.</p>
+            </div>
+          )}
         </section>
       )}
     </main>

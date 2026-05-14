@@ -3,13 +3,13 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { BookOpenCheck, BookOpenText, LayoutDashboard, Monitor, Settings2, UsersRound, Calendar, Layers } from "lucide-react";
+import { ArrowRight, BookOpenCheck, BookOpenText, LayoutDashboard, Monitor, Settings2, UsersRound, Calendar, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type AdminDashboardTab, useAdminDashboardFilters } from "./hooks/useAdminDashboardFilters";
 
-const tabShell = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm text-[var(--text-muted)]";
+const tabShell = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm text-[var(--text-muted)]";
 
 function TabLoadingState({ label }: { label: string }) {
   return <Card className={tabShell}>{label}</Card>;
@@ -108,20 +108,20 @@ export function AdminDashboard() {
                 <Badge tone="blue">URL-synced tabs</Badge>
               </div>
               <div>
-                <h1 className="font-[family-name:var(--font-fraunces)] text-2xl font-semibold tracking-tight text-[var(--text-primary)] md:text-5xl">
+                <h1 className="text-2xl font-semibold text-[var(--text-primary)] md:text-4xl">
                   Admin dashboard
                 </h1>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] md:text-base">
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--text-muted)] md:text-base">
                   One place for user management, course moderation, assessment review, and operational checks.
                 </p>
               </div>
             </div>
 
             <div className="grid gap-2 sm:flex sm:flex-wrap">
-              <Link href="/dashboard/admin?tab=users" className="inline-flex items-center justify-center rounded-xl bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-white transition-colors hover:opacity-90">
-                Manage users
+              <Link href="/dashboard/admin?tab=users" className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--accent-primary)] px-4 py-2 text-sm font-medium text-[var(--text-inverse)] transition-colors hover:bg-[var(--accent-secondary)]">
+                Manage users <ArrowRight className="h-4 w-4" />
               </Link>
-              <Link href="/dashboard/admin?tab=operations" className="inline-flex items-center justify-center rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)]">
+              <Link href="/dashboard/admin?tab=operations" className="inline-flex items-center justify-center rounded-lg border border-[var(--border-subtle)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-elevated)]">
                 Open operations
               </Link>
             </div>

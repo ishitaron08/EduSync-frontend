@@ -37,6 +37,9 @@ type Section = {
   enrolledCount?: number;
 };
 
+const EMPTY_SECTIONS: Section[] = [];
+const EMPTY_COURSES: Course[] = [];
+
 export function SectionsTab() {
   const pathname = usePathname();
   const router = useRouter();
@@ -76,8 +79,8 @@ export function SectionsTab() {
     staleTime: 5 * 60 * 1000,
     refetchOnMount: false
   });
-  const sections = sectionManagementQuery.data?.sections ?? [];
-  const courses = sectionManagementQuery.data?.courses ?? [];
+  const sections = sectionManagementQuery.data?.sections ?? EMPTY_SECTIONS;
+  const courses = sectionManagementQuery.data?.courses ?? EMPTY_COURSES;
   const status = sectionManagementQuery.isLoading ? "loading" : sectionManagementQuery.isError ? "error" : "ready";
   const error = localError ?? (sectionManagementQuery.error ? describeApiError(sectionManagementQuery.error) : null);
 
@@ -128,7 +131,9 @@ export function SectionsTab() {
       console.log("Students API response:", res.data);
       setAllStudents(res.data.students || []);
     } catch (err) {
-      console.error("Failed to load students:", describeApiError(err));
+      const message = describeApiError(err);
+      console.error("Failed to load students:", message);
+      setLocalError(message);
       setAllStudents([]);
     } finally {
       setLoadingStudents(false);
@@ -145,6 +150,7 @@ export function SectionsTab() {
     }
   }
 
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
   useEffect(() => {
     if (isFormOpen) {
       loadStudents();
@@ -196,6 +202,7 @@ export function SectionsTab() {
       openStudentModal(section._id, false);
     }
   }, [searchParams, sections, isFormOpen, isStudentModalOpen, editingId, editingSectionId]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -320,9 +327,6 @@ export function SectionsTab() {
 
   return (
     <TabChrome
-      eyebrow="Section Management"
-      title="Sections"
-      description="Create and manage class sections, assign courses and students."
       actions={
         <Button onClick={() => {
           setIsFormOpen(true);
@@ -526,7 +530,7 @@ export function SectionsTab() {
               </table>
             }
             renderCard={(sec) => (
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-semibold text-[var(--text-primary)]">{sec.sectionCode}</p>
@@ -561,8 +565,8 @@ export function SectionsTab() {
 
       {/* Student Management Modal */}
       {isStudentModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 sm:items-center">
-          <Card className="m-0 flex h-[100dvh] w-full max-w-2xl flex-col overflow-hidden rounded-none sm:m-4 sm:h-auto sm:max-h-[80vh] sm:rounded-2xl">
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-[oklch(22%_0.035_246_/_0.50)] sm:items-center">
+          <Card className="m-0 flex h-[100dvh] w-full max-w-2xl flex-col overflow-hidden rounded-none sm:m-4 sm:h-auto sm:max-h-[80vh] sm:rounded-lg">
             <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
               <h3 className="font-medium text-lg">Manage Students</h3>
               <Button variant="ghost" size="sm" onClick={() => closeSectionWorkspace()}>

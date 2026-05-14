@@ -14,7 +14,7 @@ type DataStateProps = {
   className?: string;
 };
 
-const fallbackShell = "rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm text-[var(--text-muted)]";
+const fallbackShell = "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 text-sm text-[var(--text-muted)]";
 
 export function DataState({ status, children, loading, empty, error, className }: DataStateProps) {
   if (status === "loading") {

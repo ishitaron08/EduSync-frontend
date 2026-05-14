@@ -52,7 +52,7 @@ export function TimetableBuilderStub() {
       </div>
       <div className="mt-4 grid gap-3 md:hidden">
         {DAYS.map((day) => (
-          <div key={day} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3">
+          <div key={day} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-3">
             <p className="font-mono text-[10px] uppercase text-[var(--text-muted)]">{day}</p>
             <div className="mt-3 grid grid-cols-3 gap-2">
               {HOURS.map((hour) => {

@@ -1,163 +1,309 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useDashboardGuard } from "@/lib/authGuard";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ScanLine, Sparkles, ClipboardCheck, Flame, Calendar as CalendarIcon, TrendingUp } from "lucide-react";
+import {
+  ArrowRight,
+  BookOpenCheck,
+  CalendarDays,
+  CheckCircle2,
+  ClipboardCheck,
+  Clock3,
+  Route,
+  ScanLine,
+  Sparkles,
+  Target,
+  UserCheck
+} from "lucide-react";
 import api from "@/lib/api";
 import { queryKeys } from "@/lib/queryKeys";
+import { useDashboardGuard } from "@/lib/authGuard";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+
+type StudentProfile = {
+  _id?: string;
+  name?: string;
+  rank?: number;
+  rewardPoints?: number;
+  streak?: number;
+  learningGoal?: string;
+};
+
+type StudentTask = {
+  _id: string;
+  title: string;
+  category?: string;
+  status: string;
+  durationMinutes?: number;
+  basePoints?: number;
+};
+
+type Assessment = {
+  _id: string;
+  title: string;
+  type: "mcq" | "written";
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+};
+
+type TimetableSlot = {
+  day: string;
+  startTime: string;
+  endTime: string;
+  subject: string;
+  room?: string;
+  isFreePeriod?: boolean;
+};
+
+const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+function clamp(value: number, min = 0, max = 100) {
+  return Math.max(min, Math.min(max, value));
+}
 
 export default function StudentDashboardPage() {
   const allowed = useDashboardGuard("student");
+
   const profileQuery = useQuery({
     queryKey: queryKeys.student.profile,
     queryFn: async () => {
-      const { data } = await api.get("/student/profile");
+      const { data } = await api.get<StudentProfile>("/student/profile");
       return data;
     },
     enabled: allowed
   });
-  const attendanceStatsQuery = useQuery({
-    queryKey: queryKeys.student.attendanceStats,
+
+  const tasksQuery = useQuery({
+    queryKey: queryKeys.student.tasks,
     queryFn: async () => {
-      const { data } = await api.get("/student/attendance/stats");
-      const { overall } = data;
-      return {
-        percentage: overall.percentage,
-        present: overall.present,
-        total: overall.totalRecorded
-      };
+      const { data } = await api.get("/student/tasks");
+      return Array.isArray(data) ? (data as StudentTask[]) : [];
     },
     enabled: allowed
   });
+
+  const assessmentsQuery = useQuery({
+    queryKey: queryKeys.student.assessments,
+    queryFn: async () => {
+      const { data } = await api.get("/student/assessments");
+      return Array.isArray(data) ? (data as Assessment[]) : [];
+    },
+    enabled: allowed
+  });
+
+  const timetableQuery = useQuery({
+    queryKey: queryKeys.student.timetable,
+    queryFn: async () => {
+      const { data } = await api.get<{ slots?: TimetableSlot[] }>("/student/timetable");
+      return Array.isArray(data?.slots) ? data.slots : [];
+    },
+    enabled: allowed
+  });
+
   const profile = profileQuery.data ?? null;
-  const attendanceStats = attendanceStatsQuery.data ?? null;
+  const activeTasks = useMemo(() => (tasksQuery.data ?? []).filter((task) => task.status !== "completed"), [tasksQuery.data]);
+  const completedTasks = useMemo(() => (tasksQuery.data ?? []).filter((task) => task.status === "completed"), [tasksQuery.data]);
+  const nextTask = activeTasks[0] ?? null;
+
+  const assessmentSummary = useMemo(() => {
+    const now = new Date();
+    const assessments = assessmentsQuery.data ?? [];
+    return {
+      active: assessments.filter((assessment) => new Date(assessment.startTime) <= now && new Date(assessment.endTime) >= now),
+      upcoming: assessments.filter((assessment) => new Date(assessment.startTime) > now)
+    };
+  }, [assessmentsQuery.data]);
+
+  const nextClass = useMemo(() => {
+    const slots = timetableQuery.data ?? [];
+    const today = dayNames[new Date().getDay()];
+    const nowTime = new Date().toTimeString().slice(0, 5);
+    const todaySlots = slots
+      .filter((slot) => slot.day?.toLowerCase() === today && !slot.isFreePeriod)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+    return todaySlots.find((slot) => slot.startTime >= nowTime) ?? todaySlots[0] ?? null;
+  }, [timetableQuery.data]);
+
+  const focusPlan = [
+    {
+      title: nextTask?.title ?? "Start a focused learning block",
+      detail: nextTask ? `${nextTask.category ?? "Learning"}${nextTask.durationMinutes ? `, ${nextTask.durationMinutes} min` : ""}` : "Pick a recommendation and build momentum.",
+      href: "/dashboard/student/learning",
+      icon: Sparkles,
+      cta: nextTask ? "Continue task" : "Find task"
+    },
+    {
+      title: assessmentSummary.active[0]?.title ?? assessmentSummary.upcoming[0]?.title ?? "Review upcoming assessments",
+      detail: assessmentSummary.active.length ? "Active now" : assessmentSummary.upcoming.length ? "Scheduled soon" : "No active tests at the moment.",
+      href: "/dashboard/student/assessments",
+      icon: ClipboardCheck,
+      cta: assessmentSummary.active.length ? "Take test" : "View tests"
+    },
+    {
+      title: nextClass ? `Prepare for ${nextClass.subject}` : "Check today&apos;s timetable",
+      detail: nextClass ? `${nextClass.startTime} to ${nextClass.endTime}${nextClass.room ? `, ${nextClass.room}` : ""}` : "No remaining class found for today.",
+      href: "/dashboard/student/timetable",
+      icon: CalendarDays,
+      cta: "Open timetable"
+    }
+  ];
 
   if (!allowed) {
     return (
-      <main className="mx-auto max-w-6xl p-6">
-        <div className="nc-skeleton h-12 w-48 rounded-[8px]" />
+      <main className="mx-auto w-full max-w-7xl p-6">
+        <div className="nc-skeleton h-12 w-48 rounded-lg" />
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-6xl space-y-8 px-4 py-6 md:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold text-[var(--text-primary)]">
-            Welcome back, {profile?.name?.split(' ')[0] || "Student"}!
-          </h1>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">Here&apos;s your daily overview and recommended actions.</p>
-        </div>
-      </header>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="p-5 flex flex-col items-center justify-center text-center gap-2 border-[var(--accent-amber)]/30 bg-gradient-to-br from-[var(--bg-surface)] to-[var(--accent-amber)]/5">
-          <div className="bg-[var(--accent-amber)]/10 p-3 rounded-full">
-            <Flame className="w-8 h-8 text-[var(--accent-amber)]" />
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Current Streak</p>
-            <p className="font-semibold text-2xl text-[var(--text-primary)]">{profile?.streak || 0} Days 🔥</p>
-          </div>
-        </Card>
-
-        <Card className="p-5 flex flex-col items-center justify-center text-center gap-2">
-          <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Total Points</p>
-          <p className="font-semibold text-3xl text-[var(--accent-primary)]">{profile?.rewardPoints || 0}</p>
-        </Card>
-
-        <Card className="p-5 flex flex-col items-center justify-center text-center gap-2">
-          <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Leaderboard Rank</p>
-          <p className="font-semibold text-3xl text-[var(--text-primary)]">#{profile?.rank || "--"}</p>
-          <Link href="/dashboard/student/leaderboard" className="text-xs text-[var(--accent-primary)] hover:underline">View Standings</Link>
-        </Card>
-
-        <Card className="p-5 flex flex-col items-center justify-center text-center gap-2 border-[var(--accent-secondary)]/30 bg-gradient-to-br from-[var(--bg-surface)] to-[var(--accent-secondary)]/5">
-          <div className="bg-[var(--accent-secondary)]/10 p-3 rounded-full">
-            <TrendingUp className="w-8 h-8 text-[var(--accent-secondary)]" />
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Attendance</p>
-            <p className={`font-semibold text-2xl ${
-              (attendanceStats?.percentage ?? 0) >= 75 ? "text-green-600" :
-              (attendanceStats?.percentage ?? 0) >= 50 ? "text-yellow-600" : "text-red-600"
-            }`}>
-              {attendanceStats ? `${attendanceStats.percentage}%` : "--"}
-            </p>
-          </div>
-          <Link href="/dashboard/student/attendance" className="text-xs text-[var(--accent-secondary)] hover:underline">View Details</Link>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="p-5 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-[var(--accent-secondary)]/10 p-2 rounded-lg">
-              <ScanLine className="w-6 h-6 text-[var(--accent-secondary)]" />
-            </div>
+    <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 md:px-6 lg:px-8">
+      <section>
+        <Card className="flex flex-col gap-4 p-5">
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="font-semibold text-[var(--text-primary)]">Attendance</p>
-              <p className="text-xs text-[var(--text-muted)]">Mark your presence</p>
+              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Focus queue</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Do these next</h2>
             </div>
+            <Target className="h-5 w-5 text-[var(--accent-primary)]" />
           </div>
-          <Button asChild variant="ghost" className="w-full justify-start text-sm mt-auto border-[var(--accent-secondary)]/30 hover:border-[var(--accent-secondary)] hover:text-[var(--accent-secondary)]">
-            <Link href="/dashboard/student/attendance">Scan QR Code &rarr;</Link>
-          </Button>
-        </Card>
 
-        <Card className="p-5 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-[var(--accent-primary)]/10 p-2 rounded-lg">
-              <Sparkles className="w-6 h-6 text-[var(--accent-primary)]" />
-            </div>
-            <div>
-              <p className="font-semibold text-[var(--text-primary)]">AI Learning</p>
-              <p className="text-xs text-[var(--text-muted)]">Complete pending tasks</p>
-            </div>
+          <div className="space-y-3">
+            {focusPlan.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className="group grid grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 transition-[border-color,background-color] hover:border-[var(--accent-primary)]/35 hover:bg-[var(--bg-primary)]"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]">
+                    {index === 0 ? <Icon className="h-4 w-4" /> : <span className="font-mono text-xs font-semibold">{index + 1}</span>}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{item.title}</p>
+                    <p className="truncate text-xs text-[var(--text-muted)]">{item.detail}</p>
+                  </div>
+                  <span className="hidden text-xs font-medium text-[var(--accent-primary)] sm:inline">{item.cta}</span>
+                </Link>
+              );
+            })}
           </div>
-          <Button asChild variant="filled" className="w-full justify-start text-sm mt-auto">
-            <Link href="/dashboard/student/learning">Start Learning &rarr;</Link>
-          </Button>
-        </Card>
-
-        <Card className="p-5 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-[var(--accent-amber)]/10 p-2 rounded-lg">
-              <ClipboardCheck className="w-6 h-6 text-[var(--accent-amber)]" />
-            </div>
-            <div>
-              <p className="font-semibold text-[var(--text-primary)]">Assessments</p>
-              <p className="text-xs text-[var(--text-muted)]">Upcoming tests</p>
-            </div>
-          </div>
-          <Button asChild variant="ghost" className="w-full justify-start text-sm mt-auto">
-            <Link href="/dashboard/student/assessments">View Tests &rarr;</Link>
-          </Button>
-        </Card>
-      </div>
-
-      <section className="space-y-4">
-        <p className="font-mono text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Today&apos;s Schedule</p>
-        <Card className="p-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="bg-[var(--bg-elevated)] p-3 rounded-full">
-              <CalendarIcon className="w-6 h-6 text-[var(--text-muted)]" />
-            </div>
-            <div>
-              <p className="font-semibold text-[var(--text-primary)]">Next Class: Mathematics</p>
-              <p className="text-sm text-[var(--text-muted)]">11:00 AM - 12:00 PM • Room 204</p>
-            </div>
-          </div>
-          <Button asChild variant="outline">
-            <Link href="/dashboard/student/timetable">Full Timetable</Link>
-          </Button>
         </Card>
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="p-5">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Today&apos;s lane</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">Schedule and study rhythm</h2>
+            </div>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/dashboard/student/timetable">Full timetable</Link>
+            </Button>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] p-4 md:col-span-2">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--accent-primary)] text-[var(--text-inverse)]">
+                  <Clock3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Next class</p>
+                  <p className="text-lg font-semibold text-[var(--text-primary)]">{nextClass?.subject ?? "No class queued"}</p>
+                </div>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs text-[var(--text-muted)]">Time</p>
+                  <p className="font-medium text-[var(--text-primary)]">{nextClass ? `${nextClass.startTime} to ${nextClass.endTime}` : "Clear"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--text-muted)]">Room</p>
+                  <p className="font-medium text-[var(--text-primary)]">{nextClass?.room ?? "Not assigned"}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--text-muted)]">Prep</p>
+                  <p className="font-medium text-[var(--text-primary)]">{activeTasks.length ? `${activeTasks.length} open tasks` : "No open tasks"}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+              <Route className="mb-4 h-5 w-5 text-[var(--accent-secondary)]" />
+              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Learning goal</p>
+              <p className="mt-2 text-lg font-semibold text-[var(--text-primary)]">{profile?.learningGoal ?? "Choose a goal"}</p>
+              <Button asChild variant="ghost" size="sm" className="mt-5 w-full justify-between">
+                <Link href="/dashboard/student/learning">Tune goal <ArrowRight className="h-4 w-4" /></Link>
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="p-5">
+          <div className="mb-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Momentum</p>
+              <h2 className="mt-1 text-xl font-semibold text-[var(--text-primary)]">This week</h2>
+            </div>
+            <CheckCircle2 className="h-5 w-5 text-[var(--accent-success)]" />
+          </div>
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 flex justify-between text-sm">
+                <span className="text-[var(--text-muted)]">Tasks completed</span>
+                <span className="font-medium text-[var(--text-primary)]">{completedTasks.length}/{Math.max(tasksQuery.data?.length ?? 0, 1)}</span>
+              </div>
+              <div className="h-2 rounded-full bg-[var(--bg-elevated)]">
+                <div
+                  className="h-2 rounded-full bg-[var(--accent-success)]"
+                  style={{ width: `${clamp((completedTasks.length / Math.max(tasksQuery.data?.length ?? 1, 1)) * 100)}%` }}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                <BookOpenCheck className="mb-3 h-4 w-4 text-[var(--accent-primary)]" />
+                <p className="text-2xl font-semibold text-[var(--text-primary)]">{activeTasks.length}</p>
+                <p className="text-xs text-[var(--text-muted)]">Open tasks</p>
+              </div>
+              <div className="rounded-lg border border-[var(--border-subtle)] p-3">
+                <ClipboardCheck className="mb-3 h-4 w-4 text-[var(--accent-amber)]" />
+                <p className="text-2xl font-semibold text-[var(--text-primary)]">{assessmentSummary.active.length + assessmentSummary.upcoming.length}</p>
+                <p className="text-xs text-[var(--text-muted)]">Tests queued</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <Link href="/dashboard/student/attendance" className="group rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 shadow-[var(--shadow-soft)] transition-[border-color,background-color] hover:border-[var(--accent-primary)]/35 hover:bg-[var(--bg-primary)]">
+          <ScanLine className="mb-6 h-5 w-5 text-[var(--accent-secondary)]" />
+          <p className="font-semibold text-[var(--text-primary)]">Scan attendance</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Open the QR scanner before class closes.</p>
+          <span className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-primary)]">Open scanner <ArrowRight className="h-4 w-4" /></span>
+        </Link>
+
+        <Link href="/dashboard/student/learning" className="group rounded-lg border border-[var(--accent-primary)]/25 bg-[var(--accent-primary)]/8 p-5 shadow-[var(--shadow-soft)] transition-[border-color,background-color] hover:border-[var(--accent-primary)]/45 hover:bg-[var(--accent-primary)]/10">
+          <Sparkles className="mb-6 h-5 w-5 text-[var(--accent-primary)]" />
+          <p className="font-semibold text-[var(--text-primary)]">Continue learning</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Use recommendations matched to your goal.</p>
+          <span className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-primary)]">Open plan <ArrowRight className="h-4 w-4" /></span>
+        </Link>
+
+        <Link href="/dashboard/student/profile" className="group rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 shadow-[var(--shadow-soft)] transition-[border-color,background-color] hover:border-[var(--accent-primary)]/35 hover:bg-[var(--bg-primary)]">
+          <UserCheck className="mb-6 h-5 w-5 text-[var(--accent-success)]" />
+          <p className="font-semibold text-[var(--text-primary)]">Update profile</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">Keep personal details and goal preferences current.</p>
+          <span className="mt-5 inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-primary)]">Review profile <ArrowRight className="h-4 w-4" /></span>
+        </Link>
+      </section>
     </main>
   );
 }

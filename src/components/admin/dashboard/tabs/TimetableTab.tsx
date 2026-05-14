@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, FormEvent } from "react";
+import { useEffect, useMemo, useState, FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { TabChrome } from "../TabChrome";
@@ -29,7 +29,7 @@ type Slot = {
 // but the type must reflect what actually arrives to avoid silent mismatches.
 type Timetable = {
   _id?: string;
-  // `section` is what the backend sends — an ObjectId string on the wire.
+  // `section` is what the backend sends, an ObjectId string on the wire.
   // We keep `sectionId` as an optional alias for local state compatibility.
   section?: string;
   sectionId?: string;
@@ -55,7 +55,7 @@ type Section = {
 };
 
 // The backend GET /admin/timetable/master/list always returns `section` as a
-// fully populated object (sectionCode, course, term, year, _id) — never a
+// fully populated object (sectionCode, course, term, year, _id), never a
 // plain string. The previous type allowed string | {_id} which was misleading.
 type PopulatedSection = {
   _id: string;
@@ -78,6 +78,9 @@ type MasterTimetableInfo = {
 
 const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday"];
 const TIMES = ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00"];
+const EMPTY_SECTIONS: Section[] = [];
+const EMPTY_TEACHERS: Teacher[] = [];
+const EMPTY_MASTER_TIMETABLES: MasterTimetableInfo[] = [];
 
 function teacherIdFrom(teacher: Slot["teacher"]) {
   if (typeof teacher === "string") return teacher;
@@ -122,9 +125,9 @@ export function TimetableTab() {
     staleTime: 5 * 60 * 1000,
     refetchOnMount: false
   });
-  const sections = timetableSetupQuery.data?.sections ?? [];
-  const teachers = timetableSetupQuery.data?.teachers ?? [];
-  const masterTimetables = timetableSetupQuery.data?.masterTimetables ?? [];
+  const sections = timetableSetupQuery.data?.sections ?? EMPTY_SECTIONS;
+  const teachers = timetableSetupQuery.data?.teachers ?? EMPTY_TEACHERS;
+  const masterTimetables = timetableSetupQuery.data?.masterTimetables ?? EMPTY_MASTER_TIMETABLES;
   const masterTimetableQuery = useQuery({
     queryKey: queryKeys.admin.timetable(sectionId, sectionTerm, sectionYear),
     queryFn: async () => {
@@ -210,10 +213,11 @@ export function TimetableTab() {
     return entry.sectionId || entry.section?._id || "";
   };
 
-  const checkExistingTimetable = (sectId: string) => {
-    return masterTimetables.some(t => getTimetableSectionId(t) === String(sectId));
-  };
+  const timetableSectionIds = useMemo(() => new Set(masterTimetables.map(getTimetableSectionId)), [masterTimetables]);
 
+  const checkExistingTimetable = (sectId: string) => timetableSectionIds.has(String(sectId));
+
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (sections.length === 0) return;
 
@@ -246,6 +250,7 @@ export function TimetableTab() {
       setError(null);
     }
   }, [masterTimetableQuery.data, sectionId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Refresh master timetables list
   const refreshMasterTimetables = async () => {
@@ -345,9 +350,6 @@ export function TimetableTab() {
 
   return (
     <TabChrome
-      eyebrow="Timetable Management"
-      title="Master Schedule Builder"
-      description="Edit existing timetables or create new ones for sections."
       actions={
         sectionId && timetable && (
           <Button 
@@ -540,7 +542,7 @@ export function TimetableTab() {
                 {TIMES.map(time => {
                   const slot = getSlotAt(mobileDay, time);
                   return (
-                    <div key={`${mobileDay}-${time}`} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                    <div key={`${mobileDay}-${time}`} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
                       <div className="mb-2 flex items-center justify-between gap-3">
                         <span className="font-medium text-[var(--text-primary)]">{time}</span>
                         <span className="text-xs capitalize text-[var(--text-muted)]">{mobileDay}</span>
@@ -568,7 +570,7 @@ export function TimetableTab() {
                 })}
               </div>
 
-              <div className="hidden overflow-x-auto rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] md:block">
+              <div className="hidden overflow-x-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] md:block">
                 <table className="min-w-full text-left text-sm border-collapse">
                   <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)] border-b border-[var(--border-subtle)]">
                     <tr>

@@ -1,56 +1,69 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
+import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, User, Key, Target, Activity, Loader2 } from "lucide-react";
+import { AlertTriangle, Award, Flame, KeyRound, Loader2, Mail, Target, UserRound } from "lucide-react";
 
 const PRESET_GOALS = ["Academic Improvement", "Placement Preparation", "Skill Development"];
 
+type StudentProfile = {
+  name?: string;
+  email?: string;
+  learningGoal?: string;
+  rewardPoints?: number;
+  streak?: number;
+  createdAt?: string;
+  pointsBreakdown?: {
+    aiTasks?: number;
+    tests?: number;
+    streakBonuses?: number;
+  };
+};
+
 export default function StudentProfilePage() {
   const allowed = useDashboardGuard("student");
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  
-  // Form states
-  const [name, setName] = useState("");
-  const [goal, setGoal] = useState("");
+  const queryClient = useQueryClient();
+  const [name, setName] = useState<string | null>(null);
+  const [goal, setGoal] = useState<string | null>(null);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!allowed) return;
-    fetchProfile();
-  }, [allowed]);
+  const profileQuery = useQuery({
+    queryKey: queryKeys.student.profile,
+    queryFn: async () => {
+      const { data } = await api.get<StudentProfile>("/student/profile");
+      return data;
+    },
+    enabled: allowed
+  });
 
-  const fetchProfile = async () => {
-    try {
-      const { data } = await api.get("/student/profile");
-      setProfile(data);
-      setName(data.name || "");
-      setGoal(data.learningGoal || "");
-    } catch (err) {
-      setError(describeApiError(err));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const profile = profileQuery.data ?? null;
 
-  if (!allowed || loading) {
-    return <main className="p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
+  if (!allowed || profileQuery.isLoading) {
+    return (
+      <main className="p-6">
+        <div className="nc-skeleton h-10 w-48 rounded-lg" />
+      </main>
+    );
   }
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const currentName = name ?? profile?.name ?? "";
+  const currentGoal = goal ?? profile?.learningGoal ?? "";
+  const isGoalChanged = currentGoal !== (profile?.learningGoal ?? "");
+
+  async function handleSave(event: FormEvent) {
+    event.preventDefault();
     setError(null);
     setSuccess(null);
 
@@ -61,165 +74,117 @@ export default function StudentProfilePage() {
 
     try {
       setSaving(true);
-      const payload: any = { name, learningGoal: goal };
-      if (password) {
-        payload.password = password;
-      }
-
+      const payload: { name: string; learningGoal: string; password?: string } = { name: currentName, learningGoal: currentGoal };
+      if (password) payload.password = password;
       await api.patch("/student/profile", payload);
-      setSuccess("Profile updated successfully!");
+      setSuccess("Profile updated successfully.");
       setPassword("");
       setConfirmPassword("");
-      await fetchProfile();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.student.profile });
     } catch (err) {
       setError(describeApiError(err));
     } finally {
       setSaving(false);
     }
-  };
-
-  const isGoalChanged = goal !== profile?.learningGoal;
+  }
 
   return (
-    <main className="mx-auto max-w-4xl px-4 py-6 md:px-6 space-y-8">
-      <div className="mb-6">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-3xl text-[var(--text-primary)]">Profile & Settings</h1>
-        <p className="text-sm text-[var(--text-muted)]">Manage your account and customize your learning experience.</p>
-      </div>
+    <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 md:px-6 lg:px-8">
+      {(error || profileQuery.error) ? (
+        <div className="rounded-lg border border-[var(--accent-danger)]/25 bg-[var(--accent-danger)]/8 p-3 text-sm text-[var(--accent-danger)]">{error || describeApiError(profileQuery.error)}</div>
+      ) : null}
+      {success ? <div className="rounded-lg border border-[var(--accent-success)]/25 bg-[var(--accent-success)]/10 p-3 text-sm text-[var(--accent-success)]">{success}</div> : null}
 
-      {error && <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>}
-      {success && <div className="p-4 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">{success}</div>}
+      <section className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <Card className="p-5">
+          <form onSubmit={handleSave} className="space-y-7">
+            <section>
+              <div className="mb-4 flex items-center gap-2">
+                <UserRound className="h-5 w-5 text-[var(--accent-primary)]" />
+                <h2 className="text-xl font-semibold text-[var(--text-primary)]">Personal information</h2>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="space-y-1.5">
+                  <span className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Full name</span>
+                  <Input value={currentName} onChange={(event) => setName(event.target.value)} required />
+                </label>
+                <label className="space-y-1.5">
+                  <span className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Email</span>
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                    <Input className="bg-[var(--bg-elevated)] pl-9" value={profile?.email || ""} readOnly disabled />
+                  </div>
+                </label>
+              </div>
+            </section>
 
-      <div className="grid gap-8 md:grid-cols-3">
-        <div className="md:col-span-2 space-y-6">
-          <Card className="p-6">
-            <form onSubmit={handleSave} className="space-y-6">
-              <div>
-                <h2 className="text-lg font-semibold flex items-center gap-2 mb-4 border-b border-[var(--border-subtle)] pb-2">
-                  <User className="w-5 h-5 text-[var(--accent-primary)]" /> Personal Information
-                </h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs uppercase text-[var(--text-muted)] tracking-wider">Full Name</label>
-                    <Input className="mt-1" value={name} onChange={e => setName(e.target.value)} required />
-                  </div>
-                  <div>
-                    <label className="text-xs uppercase text-[var(--text-muted)] tracking-wider">Email (Read Only)</label>
-                    <Input className="mt-1 bg-[var(--bg-elevated)]" value={profile?.email} readOnly disabled />
-                  </div>
+            <section>
+              <div className="mb-4 flex items-center gap-2">
+                <Target className="h-5 w-5 text-[var(--accent-amber)]" />
+                <h2 className="text-xl font-semibold text-[var(--text-primary)]">Learning goal</h2>
+              </div>
+              {currentGoal && !PRESET_GOALS.includes(currentGoal) ? (
+                <Input value={currentGoal} onChange={(event) => setGoal(event.target.value)} placeholder="Custom learning goal" />
+              ) : (
+                <Select value={currentGoal} onValueChange={setGoal}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a goal" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRESET_GOALS.map((preset) => <SelectItem key={preset} value={preset}>{preset}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+              {isGoalChanged ? (
+                <div className="mt-3 flex items-start gap-3 rounded-lg border border-[var(--accent-amber)]/30 bg-[var(--accent-amber)]/10 p-3 text-sm text-[var(--text-primary)]">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent-amber)]" />
+                  <p>Changing your learning goal updates future recommendations. Earned points stay untouched.</p>
                 </div>
-              </div>
+              ) : null}
+            </section>
 
-              <div>
-                <h2 className="text-lg font-semibold flex items-center gap-2 mb-4 border-b border-[var(--border-subtle)] pb-2">
-                  <Target className="w-5 h-5 text-[var(--accent-amber)]" /> Learning Goal
-                </h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs uppercase text-[var(--text-muted)] tracking-wider">Current Goal</label>
-                    {goal && !PRESET_GOALS.includes(goal) ? (
-                      <Input className="mt-1" value={goal} onChange={e => setGoal(e.target.value)} placeholder="Custom learning goal" />
-                    ) : (
-                      <Select value={goal} onValueChange={setGoal}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Select a goal" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Academic Improvement">Academic Improvement</SelectItem>
-                          <SelectItem value="Placement Preparation">Placement Preparation</SelectItem>
-                          <SelectItem value="Skill Development">Skill Development</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                    {goal && !PRESET_GOALS.includes(goal) && (
-                      <p className="mt-2 text-xs text-[var(--text-muted)]">This is a custom goal selected from Syllabus Goals.</p>
-                    )}
-                  </div>
-                  
-                  {isGoalChanged && (
-                    <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-                      <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-                      <p><strong>Warning:</strong> Changing your learning goal will reset your currently active AI Task recommendations. Your earned points will remain unaffected.</p>
-                    </div>
-                  )}
-                </div>
+            <section>
+              <div className="mb-4 flex items-center gap-2">
+                <KeyRound className="h-5 w-5 text-[var(--accent-secondary)]" />
+                <h2 className="text-xl font-semibold text-[var(--text-primary)]">Security</h2>
               </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Input type="password" placeholder="New password, optional" value={password} onChange={(event) => setPassword(event.target.value)} />
+                <Input type="password" placeholder="Confirm new password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} disabled={!password} />
+              </div>
+            </section>
 
-              <div>
-                <h2 className="text-lg font-semibold flex items-center gap-2 mb-4 border-b border-[var(--border-subtle)] pb-2">
-                  <Key className="w-5 h-5 text-[var(--accent-secondary)]" /> Security
-                </h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-xs uppercase text-[var(--text-muted)] tracking-wider">New Password</label>
-                    <Input type="password" placeholder="Leave blank to keep current" className="mt-1" value={password} onChange={e => setPassword(e.target.value)} />
-                  </div>
-                  {password && (
-                    <div>
-                      <label className="text-xs uppercase text-[var(--text-muted)] tracking-wider">Confirm Password</label>
-                      <Input type="password" placeholder="Confirm new password" className="mt-1" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className="pt-4 flex justify-end">
-                <Button type="submit" disabled={saving} variant="filled" className="px-8">
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Save Changes
-                </Button>
-              </div>
-            </form>
-          </Card>
-        </div>
-
-        <div className="md:col-span-1 space-y-6">
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold flex items-center gap-2 mb-4 border-b border-[var(--border-subtle)] pb-2">
-              <Activity className="w-5 h-5 text-[var(--text-muted)]" /> Statistics
-            </h2>
-            
-            <div className="space-y-6">
-              <div>
-                <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">Total Points</p>
-                <p className="text-3xl font-[family-name:var(--font-fraunces)] font-bold text-[var(--accent-primary)]">{profile?.rewardPoints || 0}</p>
-              </div>
-              
-              <div>
-                <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">Current Streak</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-orange-500">{profile?.streak || 0}</span>
-                  <span className="text-xl">🔥</span>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-[var(--text-muted)] uppercase tracking-wider mb-1">Points Breakdown</p>
-                <div className="space-y-2 mt-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">AI Tasks</span>
-                    <span className="font-medium">{profile?.pointsBreakdown?.aiTasks || 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">Assessments</span>
-                    <span className="font-medium">{profile?.pointsBreakdown?.tests || 0}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-muted)]">Streak Bonuses</span>
-                    <span className="font-medium">{profile?.pointsBreakdown?.streakBonuses || 0}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-[var(--border-subtle)]">
-                <p className="text-[10px] text-[var(--text-muted)] text-center">
-                  Account created: {new Date(profile?.createdAt || Date.now()).toLocaleDateString()}
-                </p>
-              </div>
+            <div className="flex justify-end border-t border-[var(--border-subtle)] pt-5">
+              <Button type="submit" disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                Save changes
+              </Button>
             </div>
-          </Card>
-        </div>
-      </div>
+          </form>
+        </Card>
+
+        <Card className="p-5">
+          <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Student stats</p>
+          <div className="mt-5 space-y-5">
+            <div className="rounded-lg border border-[var(--border-subtle)] p-4">
+              <Award className="mb-4 h-5 w-5 text-[var(--accent-primary)]" />
+              <p className="text-3xl font-semibold text-[var(--text-primary)]">{profile?.rewardPoints || 0}</p>
+              <p className="text-sm text-[var(--text-muted)]">Total points</p>
+            </div>
+            <div className="rounded-lg border border-[var(--border-subtle)] p-4">
+              <Flame className="mb-4 h-5 w-5 text-[var(--accent-amber)]" />
+              <p className="text-3xl font-semibold text-[var(--text-primary)]">{profile?.streak || 0} days</p>
+              <p className="text-sm text-[var(--text-muted)]">Current streak</p>
+            </div>
+            <div className="space-y-2 rounded-lg border border-[var(--border-subtle)] p-4">
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Points breakdown</p>
+              <div className="flex justify-between text-sm"><span className="text-[var(--text-muted)]">AI Tasks</span><span>{profile?.pointsBreakdown?.aiTasks || 0}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-[var(--text-muted)]">Assessments</span><span>{profile?.pointsBreakdown?.tests || 0}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-[var(--text-muted)]">Streak bonuses</span><span>{profile?.pointsBreakdown?.streakBonuses || 0}</span></div>
+            </div>
+          </div>
+        </Card>
+      </section>
     </main>
   );
 }

@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpenCheck, ChevronDown, ChevronRight, Loader2, RefreshCw, Target } from "lucide-react";
+import { ArrowRight, BookOpenCheck, ChevronDown, ChevronRight, Loader2, RefreshCw, Target } from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { useDashboardGuard } from "@/lib/authGuard";
@@ -165,7 +164,7 @@ export default function StudentSyllabusGoalsPage() {
   }, [syllabusPlan]);
 
   if (!allowed) {
-    return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-[8px]" /></main>;
+    return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-lg" /></main>;
   }
 
   function toggleTopic(topicKey: string) {
@@ -178,19 +177,7 @@ export default function StudentSyllabusGoalsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 px-4 py-6 md:px-6">
-      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="font-[family-name:var(--font-fraunces)] text-3xl font-semibold text-[var(--text-primary)]">Syllabus Goals</h1>
-          <p className="mt-1 text-sm text-[var(--text-muted)]">Track your goal syllabus topic by topic, with progress saved separately from AI tasks.</p>
-        </div>
-        {selectedGoal && (
-          <Button asChild variant="ghost">
-            <Link href="/dashboard/student/profile">Change goal from Profile</Link>
-          </Button>
-        )}
-      </header>
-
+    <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 md:px-6 lg:px-8">
       {(error || syllabusQuery.error) && (
         <Card className="border-[var(--accent-danger)]/30 bg-[var(--accent-danger)]/5 p-4 text-sm text-[var(--accent-danger)]">
           {error || describeApiError(syllabusQuery.error)}
@@ -202,15 +189,16 @@ export default function StudentSyllabusGoalsPage() {
           <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading syllabus goals...
         </Card>
       ) : !selectedGoal ? (
-        <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
           <section className="grid gap-4 md:grid-cols-3">
             {data?.presetGoals.map((goal) => (
               <Card key={goal.key} className="flex flex-col p-5">
                 <Target className="h-7 w-7 text-[var(--accent-primary)]" />
-                <h2 className="mt-4 text-lg font-semibold text-[var(--text-primary)]">{goal.title}</h2>
-                <p className="mt-2 flex-1 text-sm text-[var(--text-muted)]">{goal.description}</p>
-                <Button className="mt-5" disabled={isBusy} onClick={() => selectGoalMutation.mutate({ presetKey: goal.key })}>
+                <h2 className="mt-8 text-xl font-semibold text-[var(--text-primary)]">{goal.title}</h2>
+                <p className="mt-2 flex-1 text-sm leading-6 text-[var(--text-muted)]">{goal.description}</p>
+                <Button className="mt-6 justify-between" disabled={isBusy} onClick={() => selectGoalMutation.mutate({ presetKey: goal.key })}>
                   {selectGoalMutation.isPending ? "Generating..." : "Select Goal"}
+                  <ArrowRight className="h-4 w-4" />
                 </Button>
               </Card>
             ))}
@@ -222,7 +210,7 @@ export default function StudentSyllabusGoalsPage() {
             <div className="mt-4 space-y-3">
               <Input placeholder="Goal title" value={customTitle} onChange={(event) => setCustomTitle(event.target.value)} />
               <textarea
-                className="min-h-24 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm"
+                className="min-h-24 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 text-sm"
                 placeholder="Goal description"
                 value={customDescription}
                 onChange={(event) => setCustomDescription(event.target.value)}
@@ -235,14 +223,14 @@ export default function StudentSyllabusGoalsPage() {
         </div>
       ) : (
         <>
-          <Card className="border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/5 p-5">
+          <Card className="border-[var(--accent-primary)]/30 bg-[var(--accent-primary)]/8 p-5">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Selected goal is locked here</p>
                 <h2 className="mt-1 text-2xl font-semibold text-[var(--text-primary)]">{selectedGoal.title}</h2>
                 {selectedGoal.description && <p className="mt-1 text-sm text-[var(--text-muted)]">{selectedGoal.description}</p>}
               </div>
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 text-center">
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 text-center">
                 <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Progress</p>
                 <p className="text-2xl font-semibold text-[var(--accent-primary)]">{averageProgress}%</p>
               </div>
@@ -289,7 +277,7 @@ export default function StudentSyllabusGoalsPage() {
                     {open && (
                       <div className="space-y-3 border-t border-[var(--border-subtle)] p-4">
                         {topic.subtopics.map((subtopic) => (
-                          <div key={subtopic.key} className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+                          <div key={subtopic.key} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
                             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                               <div>
                                 <p className="font-medium text-[var(--text-primary)]">{subtopic.title}</p>

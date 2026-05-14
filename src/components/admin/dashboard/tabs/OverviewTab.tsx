@@ -79,11 +79,7 @@ export function OverviewTab() {
   const error = metricsQuery.error ? describeApiError(metricsQuery.error) : null;
 
   return (
-    <TabChrome
-      eyebrow="Overview"
-      title="Command center"
-      description="Real-time insights and actionable metrics for your institution."
-    >
+    <TabChrome>
       <DataState
         status={status}
         error={error}
@@ -170,7 +166,7 @@ export function OverviewTab() {
               <p className="mt-1 text-sm text-[var(--text-muted)]">Key performance indicators for student engagement.</p>
               
               <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-xl border border-[var(--border-subtle)] p-4 text-center">
+                <div className="rounded-lg border border-[var(--border-subtle)] p-4 text-center">
                   <div className="flex items-center justify-center gap-2">
                     <CheckCircle2 className="h-4 w-4 text-[var(--accent-success)]" />
                     <span className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Task Completion</span>
@@ -181,7 +177,7 @@ export function OverviewTab() {
                   <p className="mt-1 text-xs text-[var(--text-muted)]">This week</p>
                 </div>
 
-                <div className="rounded-xl border border-[var(--border-subtle)] p-4 text-center">
+                <div className="rounded-lg border border-[var(--border-subtle)] p-4 text-center">
                   <div className="flex items-center justify-center gap-2">
                     <UsersRound className="h-4 w-4 text-[var(--accent-primary)]" />
                     <span className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Attendance</span>
@@ -192,7 +188,7 @@ export function OverviewTab() {
                   <p className="mt-1 text-xs text-[var(--text-muted)]">Average rate</p>
                 </div>
 
-                <div className="rounded-xl border border-[var(--border-subtle)] p-4 text-center">
+                <div className="rounded-lg border border-[var(--border-subtle)] p-4 text-center">
                   <div className="flex items-center justify-center gap-2">
                     <Target className="h-4 w-4 text-[var(--accent-secondary)]" />
                     <span className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Active Goals</span>
@@ -214,7 +210,7 @@ export function OverviewTab() {
 
               <div className="mt-4 space-y-3">
                 {/* Pending Courses */}
-                <div className="rounded-xl border border-[var(--border-subtle)] p-3">
+                <div className="rounded-lg border border-[var(--border-subtle)] p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <BookOpenText className="h-4 w-4 text-[var(--accent-warning)]" />
@@ -245,7 +241,7 @@ export function OverviewTab() {
                 </div>
 
                 {/* At-Risk Students */}
-                <div className="rounded-xl border border-[var(--border-subtle)] p-3">
+                <div className="rounded-lg border border-[var(--border-subtle)] p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <AlertTriangle className="h-4 w-4 text-[var(--accent-danger)]" />
@@ -278,7 +274,7 @@ export function OverviewTab() {
                 </div>
 
                 {/* Upcoming Assessments */}
-                <div className="rounded-xl border border-[var(--border-subtle)] p-3">
+                <div className="rounded-lg border border-[var(--border-subtle)] p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-[var(--accent-primary)]" />
@@ -327,7 +323,7 @@ export function OverviewTab() {
                 metrics.leaderboard.map((row, index) => (
                   <div
                     key={row.studentId}
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-[var(--border-subtle)] p-3"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] p-3"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -342,7 +338,7 @@ export function OverviewTab() {
                   </div>
                 ))
               ) : (
-                <div className="col-span-full rounded-xl border border-[var(--border-subtle)] p-4 text-center text-sm text-[var(--text-muted)]">
+                <div className="col-span-full rounded-lg border border-[var(--border-subtle)] p-4 text-center text-sm text-[var(--text-muted)]">
                   No leaderboard data available
                 </div>
               )}

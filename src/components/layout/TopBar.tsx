@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { CalendarDays, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -10,6 +10,13 @@ const titles: Record<string, string> = {
   "/": "Home",
   "/auth": "Access",
   "/dashboard/student": "Mission Control",
+  "/dashboard/student/timetable": "Timetable",
+  "/dashboard/student/attendance": "Attendance",
+  "/dashboard/student/learning": "AI Learning",
+  "/dashboard/student/syllabus-goals": "Syllabus Goals",
+  "/dashboard/student/assessments": "Assessments",
+  "/dashboard/student/leaderboard": "Leaderboard",
+  "/dashboard/student/profile": "Profile",
   "/dashboard/teacher": "Teaching Hub",
   "/dashboard/teacher/timetable": "My Schedule",
   "/dashboard/admin": "Admin dashboard",
@@ -36,7 +43,7 @@ export function TopBar({
   }
 
   return (
-    <header className="hidden h-14 shrink-0 items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)]/95 px-4 backdrop-blur-sm md:flex md:px-6">
+    <header className="hidden h-14 shrink-0 items-center justify-between gap-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 md:flex md:px-6">
       <div className="flex min-w-0 items-center gap-3">
         <Button
           type="button"
@@ -47,11 +54,18 @@ export function TopBar({
         >
           {expanded ? <PanelLeftClose className="h-5 w-5" /> : <PanelLeftOpen className="h-5 w-5" />}
         </Button>
-        <h1 className="truncate font-[family-name:var(--font-fraunces)] text-lg font-semibold tracking-tight text-[var(--text-primary)] md:text-xl">
-          {title}
-        </h1>
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">EduSync</p>
+          <h1 className="truncate text-lg font-semibold leading-tight text-[var(--text-primary)] md:text-xl">
+            {title}
+          </h1>
+        </div>
       </div>
       <div className="flex items-center gap-3">
+        <div className="hidden h-9 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-primary)] px-3 text-sm text-[var(--text-muted)] lg:flex" aria-hidden>
+          <CalendarDays className="h-4 w-4" />
+          Today
+        </div>
         {role ? (
           <>
             <Badge tone="amber">{role}</Badge>

@@ -9,6 +9,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { useDashboardGuard } from "@/lib/authGuard";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { TeacherPageShell } from "@/components/teacher/TeacherPageShell";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { QRCodeSVG } from "qrcode.react";
 import { CheckCircle2, QrCode, ScanLine, UserCheck } from "lucide-react";
@@ -63,6 +64,7 @@ const statusLabels: Record<AttendanceStatus, string> = {
   late: "Late",
   excused: "Excused"
 };
+const EMPTY_SECTIONS: TeacherSection[] = [];
 
 function sectionLabel(section: TeacherSection) {
   return `${section.course?.code ? `${section.course.code} - ` : ""}${section.course?.name || "Course"} (${section.sectionCode})`;
@@ -156,7 +158,7 @@ export default function TeacherAttendancePage() {
     },
     onError: (error) => setLoadErr(describeApiError(error))
   });
-  const sections = sectionsQuery.data ?? [];
+  const sections = sectionsQuery.data ?? EMPTY_SECTIONS;
   const students = attendanceQuery.data?.students ?? [];
   const records = attendanceQuery.data?.records ?? [];
   const savingStudentId = manualAttendanceMutation.variables?.studentId ?? null;
@@ -168,6 +170,7 @@ export default function TeacherAttendancePage() {
   const slots = selectedSection?.attendanceSlots ?? [];
   const selectedSlot = slots.find(slot => slot.key === slotKey);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const urlMode = searchParams.get("mode");
     if (urlMode === "qr" || urlMode === "manual") {
@@ -195,6 +198,7 @@ export default function TeacherAttendancePage() {
     if (attendanceQuery.error) setLoadErr(describeApiError(attendanceQuery.error));
     if (!attendanceQuery.error) setLoadErr(null);
   }, [attendanceQuery.data?.session, attendanceQuery.error, sectionId, slotKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
     if (!expiresAt) return;
@@ -261,13 +265,9 @@ export default function TeacherAttendancePage() {
   const presentCount = records.filter(record => record.status === "present" || !record.status).length;
 
   return (
-    <main className="mx-auto max-w-6xl px-3 py-4 md:px-6 md:py-6">
-      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="font-[family-name:var(--font-fraunces)] text-2xl text-[var(--text-primary)] md:text-3xl">Class Attendance</h1>
-          <p className="text-sm text-[var(--text-muted)]">Use QR scanning or mark students manually for your own timetable slots.</p>
-        </div>
-        <div className="inline-flex rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1">
+    <TeacherPageShell
+      actions={
+        <div className="inline-flex rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1">
           <Button type="button" variant={mode === "qr" ? "filled" : "ghost"} size="sm" onClick={() => { setMode("qr"); updateAttendanceUrl({ mode: "qr" }); }}>
             <QrCode className="mr-2 h-4 w-4" /> QR
           </Button>
@@ -275,7 +275,8 @@ export default function TeacherAttendancePage() {
             <UserCheck className="mr-2 h-4 w-4" /> Manual
           </Button>
         </div>
-      </div>
+      }
+    >
 
       {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)]">{loadErr}</p>}
       {message && <p className="mb-4 text-sm text-[var(--accent-primary)]">{message}</p>}
@@ -336,7 +337,7 @@ export default function TeacherAttendancePage() {
           {token ? (
             <Card className="flex flex-col items-center justify-center border-[var(--accent-primary)] p-4 text-center md:p-8">
               <p className="mb-4 text-sm text-[var(--text-muted)]">Project this on screen for students to scan</p>
-              <div className="mb-4 inline-block rounded-xl bg-white p-4 shadow-sm">
+              <div className="mb-4 inline-block rounded-lg bg-white p-4 shadow-sm">
                 <QRCodeSVG value={token} size={250} className="h-[min(62vw,250px)] w-[min(62vw,250px)]" />
               </div>
               <p className="font-mono text-2xl font-semibold text-[var(--accent-primary)]">{formatTime(timeLeft)}</p>
@@ -421,6 +422,6 @@ export default function TeacherAttendancePage() {
           </div>
         </Card>
       )}
-    </main>
+    </TeacherPageShell>
   );
 }

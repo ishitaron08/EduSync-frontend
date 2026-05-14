@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { ResponsiveTable } from "@/components/ui/responsive-table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Check, Plus, Trash2 } from "lucide-react";
+import { TeacherPageShell } from "@/components/teacher/TeacherPageShell";
 
 type TeacherSection = {
   _id: string;
@@ -45,6 +46,9 @@ type Assessment = {
   durationMinutes: number;
   questions?: Question[];
 };
+
+const EMPTY_SECTIONS: TeacherSection[] = [];
+const EMPTY_ASSESSMENTS: Assessment[] = [];
 
 const blankQuestion = (): Question => ({
   prompt: "",
@@ -159,10 +163,11 @@ export default function TeacherTestsPage() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.teacher.assessments });
     }
   });
-  const sections = sectionsQuery.data ?? [];
-  const assessments = assessmentsQuery.data ?? [];
+  const sections = sectionsQuery.data ?? EMPTY_SECTIONS;
+  const assessments = assessmentsQuery.data ?? EMPTY_ASSESSMENTS;
   const saving = createAssessmentMutation.isPending;
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const urlSection = searchParams.get("section");
     if (urlSection && sections.some(section => section._id === urlSection)) {
@@ -183,6 +188,7 @@ export default function TeacherTestsPage() {
     const queryError = sectionsQuery.error ?? assessmentsQuery.error;
     if (queryError) setLoadErr(describeApiError(queryError));
   }, [assessmentsQuery.error, sectionsQuery.error]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const commonValid = title.trim() && sectionId && Number(duration) > 0 && startTime && endTime;
   const mcqValid = Boolean(commonValid && questions.length > 0 && questions.every(questionIsValid));
@@ -335,11 +341,7 @@ export default function TeacherTestsPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-3 py-4 md:px-6 md:py-6">
-      <div className="mb-6">
-        <h1 className="font-[family-name:var(--font-fraunces)] text-2xl text-[var(--text-primary)] md:text-3xl">Manage Tests</h1>
-        <p className="text-sm text-[var(--text-muted)]">Create drafts, publish ready tests, and export results.</p>
-      </div>
+    <TeacherPageShell>
 
       {loadErr && <p className="mb-4 text-sm text-[var(--accent-danger)]">{loadErr}</p>}
       {success && <p className="mb-4 text-sm text-[var(--accent-primary)]">{success}</p>}
@@ -523,8 +525,9 @@ export default function TeacherTestsPage() {
                   {writtenSourceMode === "upload" && (
                     <div>
                       <label className="text-xs uppercase text-[var(--text-muted)]">Image / PDF Upload</label>
-                      <Input className="mt-1" type="file" accept="image/*,.pdf" onChange={e => handleWrittenPaperUpload(e.target.files?.[0] ?? null)} />
+                    <Input className="mt-1" type="file" accept="image/*,.pdf" onChange={e => handleWrittenPaperUpload(e.target.files?.[0] ?? null)} />
                     {fileUrl.startsWith("data:image/") && (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img src={fileUrl} alt="Uploaded question paper preview" className="mt-3 max-h-64 rounded-lg border border-[var(--border-subtle)] object-contain" />
                     )}
                     {fileUrl.startsWith("data:application/pdf") && (
@@ -602,7 +605,7 @@ export default function TeacherTestsPage() {
               </table>
             }
             renderCard={(assessment) => (
-              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate font-medium text-[var(--text-primary)]">{assessment.title}</p>
@@ -631,6 +634,6 @@ export default function TeacherTestsPage() {
           />
         </TabsContent>
       </Tabs>
-    </main>
+    </TeacherPageShell>
   );
 }

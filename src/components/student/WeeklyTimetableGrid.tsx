@@ -99,7 +99,7 @@ export function WeeklyTimetableGrid() {
                       </p>
                       <Link
                         href={`/dashboard/student/learning?duration=${s.durationMinutes ?? 60}`}
-                        className="mt-1 rounded-md border border-[var(--accent-primary)]/30 px-2 py-1 text-center text-[10px] font-medium text-[var(--accent-primary)] hover:bg-[var(--accent-primary)] hover:text-white transition-colors"
+                        className="mt-1 rounded-md border border-[var(--accent-primary)]/30 px-2 py-1 text-center text-[10px] font-medium text-[var(--accent-primary)] transition-colors hover:bg-[var(--accent-primary)] hover:text-[var(--text-inverse)]"
                       >
                         Get Tasks
                       </Link>

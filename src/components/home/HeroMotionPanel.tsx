@@ -101,7 +101,7 @@ export function HeroMotionPanel() {
           <MotionSignals />
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-zinc-900/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
+        <div className="rounded-lg border border-white/10 bg-zinc-900/70 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
           <div className="flex items-center gap-2 text-zinc-300">
             <LightningBoltIcon className="h-4 w-4 text-emerald-300" />
             <p className="text-sm">Scheduler command stream</p>
@@ -132,7 +132,7 @@ export function HeroMotionPanel() {
           </motion.div>
         </div>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
           <div className="mb-3 flex items-center gap-2 text-zinc-300">
             <PersonIcon className="h-4 w-4 text-emerald-300" />
             <p className="text-sm">Adaptive priority loop</p>
@@ -140,7 +140,7 @@ export function HeroMotionPanel() {
           <AutoPriorityList />
         </div>
 
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
           <div className="flex items-center justify-between">
             <p className="text-sm text-zinc-300">Stream health</p>
             <motion.span

@@ -35,7 +35,7 @@ export function MagneticLaunchButton({ href, children }: MagneticLaunchButtonPro
         href={href}
         onPointerMove={onPointerMove}
         onPointerLeave={onPointerLeave}
-        className="inline-flex items-center justify-center rounded-2xl border border-emerald-300/30 bg-emerald-500/90 px-5 py-3 text-sm font-medium text-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-emerald-400 active:-translate-y-[1px] active:scale-[0.98]"
+        className="inline-flex items-center justify-center rounded-lg border border-emerald-300/30 bg-emerald-500/90 px-5 py-3 text-sm font-medium text-zinc-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-emerald-400 active:-translate-y-[1px] active:scale-[0.98]"
       >
         {children}
       </Link>

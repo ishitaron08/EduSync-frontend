@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAdminDashboardFilters } from "../hooks/useAdminDashboardFilters";
 import api from "@/lib/api";
@@ -31,6 +31,7 @@ type CourseListResponse = {
 };
 
 const STATUS_OPTIONS = ["All statuses", "pending", "approved", "rejected"] as const;
+const EMPTY_COURSES: CourseRow[] = [];
 
 function statusTone(status: CourseRow["moderationStatus"]) {
   if (status === "approved") return "green" as const;
@@ -68,7 +69,7 @@ export function CoursesTab() {
       queryClient.invalidateQueries({ queryKey: queryKeys.admin.metrics });
     }
   });
-  const courses = coursesQuery.data ?? [];
+  const courses = coursesQuery.data ?? EMPTY_COURSES;
   const status = coursesQuery.isLoading ? "loading" : coursesQuery.isError ? "error" : "ready";
   const error = coursesQuery.error || updateStatusMutation.error ? describeApiError(coursesQuery.error ?? updateStatusMutation.error) : null;
   const savingId = updateStatusMutation.variables?.courseId ?? null;
@@ -105,11 +106,7 @@ export function CoursesTab() {
   }
 
   return (
-    <TabChrome
-      eyebrow="Courses"
-      title="Course moderation"
-      description="Real moderation data from the backend. Approve or reject inline."
-    >
+    <TabChrome>
       <DataState
         status={status}
         error={error}
@@ -141,7 +138,7 @@ export function CoursesTab() {
 
         <div className="mt-4 grid gap-3 md:hidden">
           {filteredCourses.map((course) => (
-            <div key={course._id} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
+            <div key={course._id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="break-words font-medium text-[var(--text-primary)]">{course.code} - {course.name}</p>
@@ -164,7 +161,7 @@ export function CoursesTab() {
           ))}
         </div>
 
-        <div className="mt-4 hidden rounded-2xl border border-[var(--border-subtle)] md:block">
+        <div className="mt-4 hidden rounded-lg border border-[var(--border-subtle)] md:block">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[var(--bg-elevated)] text-[var(--text-muted)]">
               <tr>

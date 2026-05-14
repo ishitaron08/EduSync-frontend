@@ -8,9 +8,9 @@ const Tabs = TabsPrimitive.Root;
 
 // TabsList variants
 const tabsListVariants = {
-  default: "inline-flex h-11 items-center justify-center rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-1 text-[var(--text-muted)]",
+  default: "inline-flex h-11 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-1 text-[var(--text-muted)]",
   pills: "flex w-full flex-wrap justify-start gap-2 bg-transparent p-0",
-  grid: "mb-5 grid h-auto w-full grid-cols-3 bg-[var(--bg-elevated)]",
+  grid: "mb-5 grid h-auto w-full grid-cols-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-1",
 };
 
 interface TabsListProps extends React.ComponentPropsWithoutRef<typeof TabsPrimitive.List> {
@@ -31,9 +31,9 @@ TabsList.displayName = TabsPrimitive.List.displayName;
 
 // TabsTrigger variants
 const tabsTriggerVariants = {
-  default: "inline-flex items-center justify-center whitespace-nowrap rounded-xl px-3 py-1.5 text-sm font-medium ring-offset-[var(--bg-primary)] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-[var(--accent-primary)] data-[state=active]:text-white data-[state=active]:shadow-sm",
-  pills: "shrink-0 gap-2 rounded-full border border-[var(--border-subtle)] px-4 py-2 data-[state=active]:border-[var(--accent-primary)] data-[state=active]:bg-[var(--accent-primary)]/10 data-[state=active]:text-[var(--accent-primary)]",
-  grid: "",
+  default: "inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-[var(--bg-primary)] transition-[background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-[var(--accent-primary)] data-[state=active]:text-[var(--text-inverse)] data-[state=active]:shadow-sm",
+  pills: "shrink-0 gap-2 rounded-lg border border-[var(--border-subtle)] px-4 py-2 text-sm font-medium text-[var(--text-muted)] transition-[background-color,border-color,color] data-[state=active]:border-[var(--accent-primary)] data-[state=active]:bg-[var(--accent-primary)]/10 data-[state=active]:text-[var(--accent-primary)]",
+  grid: "rounded-md px-3 py-2 text-sm font-medium text-[var(--text-muted)] transition-[background-color,color,box-shadow] data-[state=active]:bg-[var(--bg-surface)] data-[state=active]:text-[var(--text-primary)] data-[state=active]:shadow-sm",
 };
 
 interface TabsTriggerProps extends React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> {
