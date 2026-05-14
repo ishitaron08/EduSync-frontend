@@ -1,23 +1,22 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Link from "next/link";
 import {
   UsersRound,
   BookOpenText,
   Clock,
   TrendingUp,
-  AlertTriangle,
-  Calendar,
   Target,
   CheckCircle2,
-  ArrowRight
+  Search
 } from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { queryKeys } from "@/lib/queryKeys";
 import { DataState } from "../DataState";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AdminEmptyState, TabChrome } from "../TabChrome";
 
@@ -59,14 +58,9 @@ function formatPercentage(value: number) {
   return `${value}%`;
 }
 
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric"
-  });
-}
-
 export function OverviewTab() {
+  const [leaderboardSearchInput, setLeaderboardSearchInput] = useState("");
+  const [leaderboardSearch, setLeaderboardSearch] = useState("");
   const metricsQuery = useQuery({
     queryKey: queryKeys.admin.metrics,
     queryFn: async () => {
@@ -77,6 +71,27 @@ export function OverviewTab() {
   const metrics = metricsQuery.data ?? null;
   const status = metricsQuery.isLoading ? "loading" : metricsQuery.isError ? "error" : "ready";
   const error = metricsQuery.error ? describeApiError(metricsQuery.error) : null;
+  useEffect(() => {
+    const nextSearch = leaderboardSearchInput.trim();
+    if (!nextSearch) {
+      setLeaderboardSearch("");
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setLeaderboardSearch(nextSearch);
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [leaderboardSearchInput]);
+
+  const filteredLeaderboard = useMemo(() => {
+    const rows = metrics?.leaderboard ?? [];
+    const needle = leaderboardSearch.trim().toLowerCase();
+    if (!needle) return rows;
+
+    return rows.filter((row) => `${row.name} ${row.email}`.toLowerCase().includes(needle));
+  }, [leaderboardSearch, metrics?.leaderboard]);
 
   return (
     <TabChrome>
@@ -158,7 +173,7 @@ export function OverviewTab() {
             </Card>
           </div>
 
-          {/* Row 2: Engagement & Actionable Items */}
+          {/* Row 2: Engagement & Leaderboard */}
           <div className="grid gap-6 xl:grid-cols-2">
             {/* Left: Engagement Overview */}
             <Card className="p-4 md:p-5">
@@ -203,147 +218,69 @@ export function OverviewTab() {
               </div>
             </Card>
 
-            {/* Right: Actionable Items */}
+            {/* Right: Top Students */}
             <Card className="p-4 md:p-5">
-              <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Action Required</p>
-              <p className="mt-1 text-sm text-[var(--text-muted)]">Items needing your attention.</p>
-
-              <div className="mt-4 space-y-3">
-                {/* Pending Courses */}
-                <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <BookOpenText className="h-4 w-4 text-[var(--accent-warning)]" />
-                      <span className="text-sm font-medium text-[var(--text-primary)]">
-                        Pending Courses
-                      </span>
-                    </div>
-                    <Badge tone="amber">{metrics?.actionable.pendingCourses.length ?? 0}</Badge>
-                  </div>
-                  {metrics?.actionable.pendingCourses.length ? (
-                    <div className="mt-2 space-y-1">
-                      {metrics.actionable.pendingCourses.slice(0, 3).map((course) => (
-                        <div key={course._id} className="flex items-center justify-between text-xs">
-                          <span className="text-[var(--text-primary)]">{course.code} - {course.name}</span>
-                          <span className="text-[var(--text-muted)]">{formatDate(course.createdAt)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs text-[var(--text-muted)]">No pending approvals</p>
-                  )}
-                  <Link
-                    href="/dashboard/admin?tab=courses"
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--accent-primary)] hover:underline"
-                  >
-                    View all <ArrowRight className="h-3 w-3" />
-                  </Link>
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Top Students</p>
+                  <p className="mt-1 text-sm text-[var(--text-muted)]">Leaderboard by reward points.</p>
                 </div>
-
-                {/* At-Risk Students */}
-                <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-[var(--accent-danger)]" />
-                      <span className="text-sm font-medium text-[var(--text-primary)]">
-                        At-Risk Students
-                      </span>
-                    </div>
-                    <Badge tone="destructive">{metrics?.actionable.atRiskStudents.length ?? 0}</Badge>
-                  </div>
-                  {metrics?.actionable.atRiskStudents.length ? (
-                    <div className="mt-2 space-y-1">
-                      {metrics.actionable.atRiskStudents.slice(0, 3).map((student) => (
-                        <div key={student._id} className="flex items-center justify-between text-xs">
-                          <span className="text-[var(--text-primary)]">{student.name}</span>
-                          <span className="text-[var(--accent-danger)]">
-                            {student.attendancePercentage}% attendance
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs text-[var(--text-muted)]">No at-risk students detected</p>
-                  )}
-                  <Link
-                    href="/dashboard/admin?tab=operations"
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--accent-primary)] hover:underline"
-                  >
-                    View details <ArrowRight className="h-3 w-3" />
-                  </Link>
+                <div className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
+                  <UsersRound className="h-4 w-4 text-[var(--accent-primary)]" />
+                  <span>{filteredLeaderboard.length}/{metrics?.leaderboard.length ?? 0} students</span>
                 </div>
+              </div>
 
-                {/* Upcoming Assessments */}
-                <div className="rounded-lg border border-[var(--border-subtle)] p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-[var(--accent-primary)]" />
-                      <span className="text-sm font-medium text-[var(--text-primary)]">
-                        Upcoming Assessments
-                      </span>
-                    </div>
-                    <Badge tone="blue">{metrics?.actionable.upcomingAssessments.length ?? 0}</Badge>
-                  </div>
-                  {metrics?.actionable.upcomingAssessments.length ? (
-                    <div className="mt-2 space-y-1">
-                      {metrics.actionable.upcomingAssessments.slice(0, 3).map((assessment) => (
-                        <div key={assessment._id} className="flex items-center justify-between text-xs">
-                          <span className="text-[var(--text-primary)]">{assessment.title}</span>
-                          <span className="text-[var(--text-muted)]">
-                            {formatDate(assessment.startTime)}
-                          </span>
+              <div
+                className="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+              >
+                <label className="relative block min-w-0">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+                  <input
+                    value={leaderboardSearchInput}
+                    onChange={(event) => setLeaderboardSearchInput(event.target.value)}
+                    placeholder="Search student"
+                    className="h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] pl-10 pr-3 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus-visible:border-[var(--accent-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--accent-primary)]/12"
+                  />
+                </label>
+                <Button type="button" size="sm" className="h-10" onClick={() => setLeaderboardSearch(leaderboardSearchInput.trim())}>
+                  Search
+                </Button>
+              </div>
+
+              <div className="mt-4 max-h-[360px] space-y-3 overflow-y-auto pr-1 [-webkit-overflow-scrolling:touch]">
+                {filteredLeaderboard.length ? (
+                  filteredLeaderboard.map((row) => {
+                    const rank = (metrics?.leaderboard ?? []).findIndex((student) => student.studentId === row.studentId) + 1;
+                    return (
+                      <div
+                        key={row.studentId}
+                        className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] p-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-xs font-medium text-[var(--accent-primary)]">
+                              {rank}
+                            </span>
+                            <p className="truncate font-medium text-[var(--text-primary)]">{row.name}</p>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-[var(--text-muted)]">{row.email}</p>
                         </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-xs text-[var(--text-muted)]">No assessments this week</p>
-                  )}
-                  <Link
-                    href="/dashboard/admin?tab=assessments"
-                    className="mt-2 inline-flex items-center gap-1 text-xs text-[var(--accent-primary)] hover:underline"
-                  >
-                    View all <ArrowRight className="h-3 w-3" />
-                  </Link>
-                </div>
+                        <div className="shrink-0 text-right">
+                          <p className="font-mono text-sm font-semibold text-[var(--accent-amber)]">{row.rewardPoints}</p>
+                          <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">points</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-lg border border-[var(--border-subtle)] p-4 text-center text-sm text-[var(--text-muted)]">
+                    {leaderboardSearch ? "No students match your search." : "No leaderboard data available"}
+                  </div>
+                )}
               </div>
             </Card>
           </div>
-
-          {/* Row 3: Leaderboard */}
-          <Card className="p-4 md:p-5">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Top Students</p>
-                <p className="mt-1 text-sm text-[var(--text-muted)]">Leaderboard by reward points.</p>
-              </div>
-              <UsersRound className="h-4 w-4 text-[var(--accent-primary)]" />
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              {metrics?.leaderboard.length ? (
-                metrics.leaderboard.map((row, index) => (
-                  <div
-                    key={row.studentId}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] p-3"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-primary)]/10 text-xs font-medium text-[var(--accent-primary)]">
-                          {index + 1}
-                        </span>
-                        <p className="truncate font-medium text-[var(--text-primary)]">{row.name}</p>
-                      </div>
-                      <p className="mt-1 truncate text-xs text-[var(--text-muted)]">{row.email}</p>
-                    </div>
-                    <Badge tone="green">{row.rewardPoints} pts</Badge>
-                  </div>
-                ))
-              ) : (
-                <div className="col-span-full rounded-lg border border-[var(--border-subtle)] p-4 text-center text-sm text-[var(--text-muted)]">
-                  No leaderboard data available
-                </div>
-              )}
-            </div>
-          </Card>
         </div>
       </DataState>
     </TabChrome>
