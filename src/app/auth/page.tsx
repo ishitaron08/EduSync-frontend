@@ -70,45 +70,47 @@ export default function AuthPage() {
   };
 
   return (
-    <main className="grid min-h-[100dvh] place-items-center bg-[var(--bg-primary)] px-4 py-8">
-      <div className="grid w-full max-w-5xl gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(380px,0.75fr)]">
-        <section className="flex min-h-[520px] flex-col justify-between rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-6 shadow-[var(--shadow-soft)] md:p-8">
+    <main className="min-h-[100dvh] bg-[var(--bg-primary)] px-4 py-4 sm:px-6 sm:py-8 lg:grid lg:place-items-center">
+      <div className="mx-auto grid w-full max-w-5xl gap-4 lg:grid-cols-[minmax(0,0.95fr)_minmax(380px,0.75fr)]">
+        <section className="order-2 flex flex-col rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-5 shadow-[var(--shadow-soft)] sm:p-6 lg:order-1 lg:min-h-[520px] lg:justify-between lg:p-8">
           <div>
-            <div className="mb-8 flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent-primary)] text-[var(--text-inverse)]">
-              <GraduationCap className="h-6 w-6" />
+            <div className="mb-5 flex items-center gap-3 lg:mb-8 lg:block">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-primary)] text-[var(--text-inverse)] lg:h-12 lg:w-12">
+                <GraduationCap className="h-5 w-5 lg:h-6 lg:w-6" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--accent-primary)] lg:mt-0">EduSync access</p>
             </div>
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--accent-primary)]">EduSync access</p>
-            <h1 className="mt-2 max-w-xl text-4xl font-semibold leading-tight text-[var(--text-primary)] md:text-5xl">
+            <h1 className="max-w-xl text-2xl font-semibold leading-tight text-[var(--text-primary)] sm:text-3xl lg:text-5xl">
               Sign in to the workspace built for your role.
             </h1>
-            <p className="mt-4 max-w-lg text-sm leading-6 text-[var(--text-muted)]">
+            <p className="mt-3 max-w-lg text-sm leading-6 text-[var(--text-muted)] lg:mt-4">
               Choose the portal first so EduSync can route you to the right dashboard and validate the account role.
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="mt-5 grid gap-2 sm:grid-cols-3 lg:mt-8 lg:gap-3">
             <div className="rounded-lg border border-[var(--border-subtle)] p-4">
-              <UserRound className="mb-4 h-5 w-5 text-[var(--accent-primary)]" />
+              <UserRound className="mb-3 h-5 w-5 text-[var(--accent-primary)] lg:mb-4" />
               <p className="text-sm font-semibold text-[var(--text-primary)]">Role-based</p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">One sign-in, separate workspaces.</p>
+              <p className="mt-1 hidden text-xs text-[var(--text-muted)] sm:block">One sign-in, separate workspaces.</p>
             </div>
             <div className="rounded-lg border border-[var(--border-subtle)] p-4">
-              <BookOpenCheck className="mb-4 h-5 w-5 text-[var(--accent-secondary)]" />
+              <BookOpenCheck className="mb-3 h-5 w-5 text-[var(--accent-secondary)] lg:mb-4" />
               <p className="text-sm font-semibold text-[var(--text-primary)]">Task-ready</p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">Dashboards open into work, not marketing.</p>
+              <p className="mt-1 hidden text-xs text-[var(--text-muted)] sm:block">Dashboards open into work, not marketing.</p>
             </div>
             <div className="rounded-lg border border-[var(--border-subtle)] p-4">
-              <ShieldCheck className="mb-4 h-5 w-5 text-[var(--accent-success)]" />
+              <ShieldCheck className="mb-3 h-5 w-5 text-[var(--accent-success)] lg:mb-4" />
               <p className="text-sm font-semibold text-[var(--text-primary)]">Protected</p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">Session state stays client-scoped.</p>
+              <p className="mt-1 hidden text-xs text-[var(--text-muted)] sm:block">Session state stays client-scoped.</p>
             </div>
           </div>
         </section>
 
-        <Card className="p-6 md:p-7">
-          <div className="mb-6">
+        <Card className="order-1 p-5 sm:p-6 md:p-7 lg:order-2">
+          <div className="mb-5 sm:mb-6">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]">{currentCopy.title}</p>
-            <h2 className="mt-2 text-2xl font-semibold text-[var(--text-primary)]">Welcome back</h2>
+            <h2 className="mt-2 text-xl font-semibold text-[var(--text-primary)] sm:text-2xl">Welcome back</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{currentCopy.detail}</p>
           </div>
 
