@@ -1,20 +1,16 @@
 import { cn } from "@/lib/utils";
-import { ReactNode } from "react";
+import type { HTMLAttributes } from "react";
 
-type CardProps = {
-  className?: string;
-  children: ReactNode;
-  onClick?: () => void;
-};
+type CardProps = HTMLAttributes<HTMLDivElement>;
 
-export function Card({ className, children, onClick }: CardProps) {
+export function Card({ className, children, ...props }: CardProps) {
   return (
     <div
       className={cn(
         "rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 shadow-[var(--shadow-soft)]",
         className
       )}
-      onClick={onClick}
+      {...props}
     >
       {children}
     </div>

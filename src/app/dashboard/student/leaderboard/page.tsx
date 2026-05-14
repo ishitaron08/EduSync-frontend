@@ -17,6 +17,13 @@ type LeaderboardEntry = {
   rewardPoints: number;
 };
 
+type LeaderboardPayload = {
+  scope: Scope;
+  generatedAt: string;
+  periodStart?: string | null;
+  rows: LeaderboardEntry[];
+};
+
 type StudentProfile = {
   _id?: string;
   learningGoal?: string;
@@ -33,7 +40,7 @@ function getScope(value: string | null): Scope {
 
 function displayName(entry: LeaderboardEntry, isMe: boolean) {
   if (isMe) return `${entry.name} (You)`;
-  return `${entry.name.split(" ").map((part) => part[0]).join(".")}.`;
+  return entry.name;
 }
 
 export default function StudentLeaderboardPage() {
@@ -46,8 +53,8 @@ export default function StudentLeaderboardPage() {
   const leaderboardQuery = useQuery({
     queryKey: queryKeys.student.leaderboard(scope),
     queryFn: async () => {
-      const { data } = await api.get(`/student/leaderboard?scope=${scope}`);
-      return (data.rows || []) as LeaderboardEntry[];
+      const { data } = await api.get<LeaderboardPayload>(`/student/leaderboard?scope=${scope}`);
+      return data;
     },
     enabled: allowed
   });
@@ -60,7 +67,7 @@ export default function StudentLeaderboardPage() {
     enabled: allowed
   });
 
-  const leaderboard = useMemo(() => leaderboardQuery.data ?? [], [leaderboardQuery.data]);
+  const leaderboard = useMemo(() => leaderboardQuery.data?.rows ?? [], [leaderboardQuery.data]);
   const profile = profileQuery.data ?? null;
   const loading = leaderboardQuery.isLoading || profileQuery.isLoading;
   const topThree = leaderboard.slice(0, 3);
@@ -78,6 +85,8 @@ export default function StudentLeaderboardPage() {
     params.set("scope", nextScope);
     router.push(`${pathname}?${params.toString()}`, { scroll: false });
   }
+
+  const scopeLabel = scope === "weekly" ? "this week" : scope === "monthly" ? "this month" : "all time";
 
   return (
     <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-5 md:px-6 lg:px-8">
@@ -99,8 +108,8 @@ export default function StudentLeaderboardPage() {
                 <span className="text-right text-sm font-medium text-[var(--text-primary)]">{profile?.learningGoal || "Not set"}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><Award className="h-4 w-4" /> Points</span>
-                <span className="font-semibold text-[var(--text-primary)]">{profile?.rewardPoints || 0}</span>
+                <span className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><Award className="h-4 w-4" /> Reward points</span>
+                <span className="font-semibold text-[var(--text-primary)]">{(profile?.rewardPoints || 0).toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="inline-flex items-center gap-2 text-sm text-[var(--text-muted)]"><Flame className="h-4 w-4" /> Streak</span>
@@ -112,14 +121,14 @@ export default function StudentLeaderboardPage() {
           <Card className="p-5">
             <TrendingUp className="mb-4 h-5 w-5 text-[var(--accent-primary)]" />
             <p className="font-semibold text-[var(--text-primary)]">Next move</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Complete AI learning tasks and assessments to add points. Streaks help keep the climb steady.</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Complete AI learning tasks to earn difficulty-based reward points. This leaderboard is showing {scopeLabel}.</p>
           </Card>
         </div>
 
         <Card className="overflow-hidden p-0">
           <div className="flex items-center justify-between border-b border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-5 py-4">
-            <h2 className="font-semibold text-[var(--text-primary)]">Top students</h2>
-            <span className="text-xs text-[var(--text-muted)]">{leaderboard.length} ranked</span>
+            <h2 className="font-semibold text-[var(--text-primary)]">Students by reward points</h2>
+            <span className="text-xs text-[var(--text-muted)]">{leaderboard.length} students ranked</span>
           </div>
 
           {loading ? (
@@ -144,19 +153,19 @@ export default function StudentLeaderboardPage() {
                       </div>
                       <div className="min-w-0">
                         <p className={`truncate font-semibold ${isMe ? "text-[var(--accent-primary)]" : "text-[var(--text-primary)]"}`}>{displayName(entry, isMe)}</p>
-                        {topThree.some((top) => top.studentId === entry.studentId) ? <p className="text-xs text-[var(--text-muted)]">Podium rank</p> : null}
+                        <p className="text-xs text-[var(--text-muted)]">{topThree.some((top) => top.studentId === entry.studentId) ? "Student, podium rank" : "Student"}</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-semibold text-[var(--text-primary)]">{entry.rewardPoints}</p>
-                      <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Points</p>
+                      <p className="text-lg font-semibold text-[var(--text-primary)]">{entry.rewardPoints.toLocaleString()}</p>
+                      <p className="text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">Reward points</p>
                     </div>
                   </div>
                 );
               })}
             </div>
           ) : (
-            <div className="p-10 text-center text-sm text-[var(--text-muted)]">No leaderboard data available yet.</div>
+            <div className="p-10 text-center text-sm text-[var(--text-muted)]">No reward points earned {scopeLabel} yet.</div>
           )}
         </Card>
       </section>

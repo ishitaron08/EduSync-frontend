@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, BookOpenCheck, CheckCircle2, ChevronDown, ChevronRight, Clock3, ListChecks, Loader2, RefreshCw, Target } from "lucide-react";
+import { ArrowRight, BookOpenCheck, CheckCircle2, ChevronDown, ChevronRight, Clock3, ListChecks, Loader2, Lock, Target } from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { useDashboardGuard } from "@/lib/authGuard";
@@ -39,6 +39,8 @@ type SyllabusPlan = {
     description?: string;
     level?: "basic" | "intermediate" | "advanced";
     order?: number;
+    completedAt?: string;
+    acknowledgedAt?: string;
     subtopics: Array<{
       key: string;
       title: string;
@@ -101,6 +103,45 @@ function taskTypeLabel(type?: string) {
   return "Practice";
 }
 
+function taskDifficulty(type?: string, level?: string): "Easy" | "Medium" | "Hard" {
+  if (type === "build") return "Hard";
+  if (level === "advanced" && (type === "practice" || type === "assess")) return "Hard";
+  if (type === "practice" || type === "assess" || level === "intermediate") return "Medium";
+  return "Easy";
+}
+
+function taskPoints(type?: string, level?: string) {
+  const difficulty = taskDifficulty(type, level);
+  if (difficulty === "Hard") return 20;
+  if (difficulty === "Medium") return 15;
+  return 10;
+}
+
+function firstIncompleteTask(plan: SyllabusPlan | null) {
+  const topics = [...(plan?.topics ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  for (const topic of topics) {
+    const subtopics = [...topic.subtopics].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    for (const subtopic of subtopics) {
+      for (const task of subtopic.tasks) {
+        if (!task.completed) return { topicKey: topic.key, subtopicKey: subtopic.key, taskKey: task.key };
+      }
+    }
+  }
+  return null;
+}
+
+function topicProgress(topic: SyllabusPlan["topics"][number]) {
+  const tasks = topic.subtopics.flatMap((subtopic) => subtopic.tasks);
+  const completedTasks = tasks.filter((task) => task.completed).length;
+  const complete = tasks.length > 0 && completedTasks === tasks.length;
+  return {
+    complete,
+    completedTasks,
+    totalTasks: tasks.length,
+    percent: tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0
+  };
+}
+
 export default function StudentSyllabusGoalsPage() {
   const allowed = useDashboardGuard("student");
   const router = useRouter();
@@ -149,38 +190,10 @@ export default function StudentSyllabusGoalsPage() {
     onError: (err) => setError(describeApiError(err))
   });
 
-  const regenerateMutation = useMutation({
-    mutationFn: () => api.post("/student/syllabus-goals/regenerate"),
-    onMutate: async () => {
-      setError(null);
-      await queryClient.cancelQueries({ queryKey: queryKeys.student.syllabusGoals });
-      const previous = queryClient.getQueryData<SyllabusGoalsPayload>(queryKeys.student.syllabusGoals);
-      if (previous?.syllabusPlan) {
-        queryClient.setQueryData<SyllabusGoalsPayload>(queryKeys.student.syllabusGoals, {
-          ...previous,
-          syllabusPlan: {
-            ...previous.syllabusPlan,
-            status: "generating",
-            errorMessage: "",
-            topics: []
-          }
-        });
-      }
-      return { previous };
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.student.syllabusGoals }),
-    onError: (err, _variables, context) => {
-      if (context?.previous) {
-        queryClient.setQueryData(queryKeys.student.syllabusGoals, context.previous);
-      }
-      setError(describeApiError(err));
-    }
-  });
-
   const data = syllabusQuery.data;
   const selectedGoal = data?.selectedGoal ?? null;
   const syllabusPlan = data?.syllabusPlan ?? null;
-  const isBusy = selectGoalMutation.isPending || createCustomMutation.isPending || regenerateMutation.isPending;
+  const isBusy = selectGoalMutation.isPending || createCustomMutation.isPending;
 
   const averageProgress = useMemo(() => {
     const subtopics = syllabusPlan?.topics.flatMap((topic) => topic.subtopics) ?? [];
@@ -198,6 +211,7 @@ export default function StudentSyllabusGoalsPage() {
       tasks: tasks.length
     };
   }, [syllabusPlan]);
+  const unlockedTask = useMemo(() => firstIncompleteTask(syllabusPlan), [syllabusPlan]);
 
   if (!allowed) {
     return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-lg" /></main>;
@@ -223,7 +237,7 @@ export default function StudentSyllabusGoalsPage() {
 
   function openTask(topicKey: string, subtopicKey: string, taskKey: string) {
     const params = new URLSearchParams({ topic: topicKey, subtopic: subtopicKey, task: taskKey });
-    router.push(`/dashboard/student/learning?${params.toString()}`);
+    router.push(`/dashboard/student/learning/task?${params.toString()}`);
   }
 
   return (
@@ -296,9 +310,6 @@ export default function StudentSyllabusGoalsPage() {
                 </p>
               )}
               <p className="mt-1 text-sm text-[var(--text-muted)]">{formatSyllabusError(syllabusPlan.errorMessage)}</p>
-              <Button className="mt-4 gap-2" disabled={regenerateMutation.isPending} onClick={() => regenerateMutation.mutate()}>
-                <RefreshCw className="h-4 w-4" /> Retry Generation
-              </Button>
             </Card>
           )}
 
@@ -317,23 +328,31 @@ export default function StudentSyllabusGoalsPage() {
                   <span className="rounded-md bg-[var(--bg-elevated)] px-2.5 py-1">{roadmapTotals.tasks} tasks</span>
                   <span className="rounded-md bg-[var(--bg-elevated)] px-2.5 py-1">{averageProgress}% complete</span>
                 </div>
-                <Button type="button" variant="ghost" size="sm" disabled={regenerateMutation.isPending} onClick={() => regenerateMutation.mutate()}>
-                  <RefreshCw className="h-4 w-4" />
-                  Regenerate
-                </Button>
               </div>
               {syllabusPlan.topics.map((topic) => {
                 const open = expandedTopics.has(topic.key);
+                const topicStatus = topicProgress(topic);
+                const topicAcknowledged = topicStatus.complete || Boolean(topic.acknowledgedAt || topic.completedAt);
                 return (
                   <Card key={topic.key} className="overflow-hidden p-0">
                     <button type="button" className="flex w-full items-center justify-between gap-3 p-4 text-left" onClick={() => toggleTopic(topic.key)}>
-                      <div className="flex items-start gap-3">
-                        <BookOpenCheck className="mt-1 h-5 w-5 shrink-0 text-[var(--accent-primary)]" />
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
+                        {topicAcknowledged ? (
+                          <CheckCircle2 className="mt-1 h-5 w-5 shrink-0 text-[var(--accent-success)]" />
+                        ) : (
+                          <BookOpenCheck className="mt-1 h-5 w-5 shrink-0 text-[var(--accent-primary)]" />
+                        )}
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="rounded-md bg-[var(--accent-primary)]/10 px-2 py-0.5 text-xs font-medium text-[var(--accent-primary)]">
                               {levelLabel(topic.level)}
                             </span>
+                            {topicAcknowledged ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-success)]/10 px-2 py-0.5 text-xs font-medium text-[var(--accent-success)]">
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Acknowledged
+                              </span>
+                            ) : null}
                             <h2 className="font-semibold text-[var(--text-primary)]">
                               {topic.order ? `${topic.order}. ` : ""}{topic.title}
                             </h2>
@@ -341,10 +360,36 @@ export default function StudentSyllabusGoalsPage() {
                           {topic.description && <p className="mt-1 text-sm text-[var(--text-muted)]">{topic.description}</p>}
                         </div>
                       </div>
-                      {open ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                      <div className="flex shrink-0 items-center gap-3">
+                        <div className="hidden min-w-24 text-right text-xs text-[var(--text-muted)] sm:block">
+                          <span className="font-medium text-[var(--text-primary)]">{topicStatus.completedTasks}/{topicStatus.totalTasks}</span> tasks
+                        </div>
+                        {open ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                      </div>
                     </button>
                     {open && (
                       <div className="space-y-3 border-t border-[var(--border-subtle)] p-4">
+                        <div className="flex flex-col gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-[var(--text-primary)]">
+                              {topicAcknowledged ? "Topic acknowledged as complete" : "Topic completion"}
+                            </p>
+                            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                              {topicAcknowledged
+                                ? `All ${topicStatus.totalTasks} tasks are complete across ${topic.subtopics.length} subtopics.`
+                                : `${topicStatus.completedTasks} of ${topicStatus.totalTasks} tasks complete. Finish every task to acknowledge this topic.`}
+                            </p>
+                          </div>
+                          <div className="flex min-w-44 items-center gap-3">
+                            <div className="h-2 flex-1 rounded-full bg-[var(--bg-elevated)]">
+                              <div
+                                className={`h-full rounded-full ${topicAcknowledged ? "bg-[var(--accent-success)]" : "bg-[var(--accent-primary)]"}`}
+                                style={{ width: `${topicStatus.percent}%` }}
+                              />
+                            </div>
+                            <span className="w-10 text-right text-xs text-[var(--text-muted)]">{topicStatus.percent}%</span>
+                          </div>
+                        </div>
                         {topic.subtopics.map((subtopic) => {
                           const subtopicOpen = expandedSubtopics.has(subtopic.key);
                           const completedTasks = subtopic.tasks.filter((task) => task.completed).length;
@@ -389,20 +434,45 @@ export default function StudentSyllabusGoalsPage() {
                                 <ul className="grid gap-2 border-t border-[var(--border-subtle)] p-3 md:grid-cols-2 xl:grid-cols-3">
                                   {subtopic.tasks.map((task, index) => (
                                     <li key={task.key || `${subtopic.key}-${index}`}>
+                                      {(() => {
+                                        const locked =
+                                          !task.completed &&
+                                          Boolean(unlockedTask) &&
+                                          !(
+                                            unlockedTask?.topicKey === topic.key &&
+                                            unlockedTask?.subtopicKey === subtopic.key &&
+                                            unlockedTask?.taskKey === task.key
+                                          );
+                                        const points = task.pointsAwarded || taskPoints(task.type, topic.level);
+                                        return (
                                       <button
                                         type="button"
-                                        className="h-full w-full rounded-lg bg-[var(--bg-elevated)] p-3 text-left text-sm transition-[background-color] hover:bg-[var(--accent-primary)]/8"
-                                        onClick={() => openTask(topic.key, subtopic.key, task.key)}
+                                        disabled={locked}
+                                        className={[
+                                          "h-full w-full rounded-lg p-3 text-left text-sm transition-[background-color]",
+                                          locked
+                                            ? "cursor-not-allowed bg-[var(--bg-elevated)] opacity-55"
+                                            : "bg-[var(--bg-elevated)] hover:bg-[var(--accent-primary)]/8"
+                                        ].join(" ")}
+                                        onClick={() => {
+                                          if (!locked) openTask(topic.key, subtopic.key, task.key);
+                                        }}
                                       >
                                         <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
                                           <span>{taskTypeLabel(task.type)}</span>
                                           {task.estimatedMinutes ? <span>{task.estimatedMinutes} min</span> : null}
-                                          <span>{task.completed ? "Complete" : "10 pts"}</span>
+                                          <span>{taskDifficulty(task.type, topic.level)}</span>
+                                          <span>{task.completed ? "Complete" : locked ? "Locked" : `${points} pts`}</span>
                                         </div>
-                                        <p className="font-medium text-[var(--text-primary)]">{task.title}</p>
+                                        <p className="flex items-start gap-2 font-medium text-[var(--text-primary)]">
+                                          {locked ? <Lock className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-muted)]" /> : null}
+                                          <span>{task.title}</span>
+                                        </p>
                                         {task.description && <p className="mt-1 text-xs text-[var(--text-muted)]">{task.description}</p>}
                                         {task.resourceHint ? <p className="mt-2 text-xs text-[var(--accent-primary)]">{task.resourceHint}</p> : null}
                                       </button>
+                                        );
+                                      })()}
                                     </li>
                                   ))}
                                 </ul>
