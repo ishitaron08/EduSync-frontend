@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, BookOpenCheck, ChevronDown, ChevronRight, Loader2, RefreshCw, Target } from "lucide-react";
+import { ArrowRight, BookOpenCheck, CheckCircle2, ChevronDown, ChevronRight, Clock3, ListChecks, Loader2, RefreshCw, Target } from "lucide-react";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
 import { useDashboardGuard } from "@/lib/authGuard";
@@ -36,12 +37,27 @@ type SyllabusPlan = {
     key: string;
     title: string;
     description?: string;
+    level?: "basic" | "intermediate" | "advanced";
+    order?: number;
     subtopics: Array<{
       key: string;
       title: string;
       description?: string;
+      order?: number;
+      estimatedHours?: number;
       progressPercent: number;
-      tasks: Array<{ title: string; description?: string }>;
+      tasks: Array<{
+        key: string;
+        title: string;
+        description?: string;
+        type?: "read" | "practice" | "build" | "revise" | "assess";
+        estimatedMinutes?: number;
+        resourceHint?: string;
+        completed?: boolean;
+        completedAt?: string;
+        pointsAwarded?: number;
+      }>;
+      bonusAwarded?: boolean;
     }>;
   }>;
 };
@@ -71,12 +87,28 @@ function formatSyllabusError(message?: string) {
   return `${provider} quota is exhausted for the current API key${seconds ? `. Try again after about ${seconds} seconds` : ""}. If it keeps failing, use an API key or project with available quota.`;
 }
 
+function levelLabel(level?: string) {
+  if (level === "advanced") return "Advanced";
+  if (level === "intermediate") return "Intermediate";
+  return "Basic";
+}
+
+function taskTypeLabel(type?: string) {
+  if (type === "read") return "Read";
+  if (type === "build") return "Build";
+  if (type === "revise") return "Revise";
+  if (type === "assess") return "Assess";
+  return "Practice";
+}
+
 export default function StudentSyllabusGoalsPage() {
   const allowed = useDashboardGuard("student");
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [customTitle, setCustomTitle] = useState("");
   const [customDescription, setCustomDescription] = useState("");
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(() => new Set());
+  const [expandedSubtopics, setExpandedSubtopics] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
 
   const syllabusQuery = useQuery({
@@ -114,13 +146,6 @@ export default function StudentSyllabusGoalsPage() {
       setCustomDescription("");
       await invalidate();
     },
-    onError: (err) => setError(describeApiError(err))
-  });
-
-  const updateProgressMutation = useMutation({
-    mutationFn: (payload: { topicKey: string; subtopicKey: string; progressPercent: number }) =>
-      api.patch("/student/syllabus-goals/progress", payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.student.syllabusGoals }),
     onError: (err) => setError(describeApiError(err))
   });
 
@@ -163,6 +188,17 @@ export default function StudentSyllabusGoalsPage() {
     return Math.round(subtopics.reduce((sum, subtopic) => sum + subtopic.progressPercent, 0) / subtopics.length);
   }, [syllabusPlan]);
 
+  const roadmapTotals = useMemo(() => {
+    const topics = syllabusPlan?.topics ?? [];
+    const subtopics = topics.flatMap((topic) => topic.subtopics);
+    const tasks = subtopics.flatMap((subtopic) => subtopic.tasks);
+    return {
+      topics: topics.length,
+      subtopics: subtopics.length,
+      tasks: tasks.length
+    };
+  }, [syllabusPlan]);
+
   if (!allowed) {
     return <main className="p-4 md:p-6"><div className="nc-skeleton h-10 w-48 rounded-lg" /></main>;
   }
@@ -174,6 +210,20 @@ export default function StudentSyllabusGoalsPage() {
       else next.add(topicKey);
       return next;
     });
+  }
+
+  function toggleSubtopic(subtopicKey: string) {
+    setExpandedSubtopics((current) => {
+      const next = new Set(current);
+      if (next.has(subtopicKey)) next.delete(subtopicKey);
+      else next.add(subtopicKey);
+      return next;
+    });
+  }
+
+  function openTask(topicKey: string, subtopicKey: string, taskKey: string) {
+    const params = new URLSearchParams({ topic: topicKey, subtopic: subtopicKey, task: taskKey });
+    router.push(`/dashboard/student/learning?${params.toString()}`);
   }
 
   return (
@@ -260,6 +310,18 @@ export default function StudentSyllabusGoalsPage() {
 
           {syllabusPlan?.status === "ready" && (
             <section className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-3">
+                <div className="flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
+                  <span className="rounded-md bg-[var(--bg-elevated)] px-2.5 py-1">{roadmapTotals.topics} topics</span>
+                  <span className="rounded-md bg-[var(--bg-elevated)] px-2.5 py-1">{roadmapTotals.subtopics} subtopics</span>
+                  <span className="rounded-md bg-[var(--bg-elevated)] px-2.5 py-1">{roadmapTotals.tasks} tasks</span>
+                  <span className="rounded-md bg-[var(--bg-elevated)] px-2.5 py-1">{averageProgress}% complete</span>
+                </div>
+                <Button type="button" variant="ghost" size="sm" disabled={regenerateMutation.isPending} onClick={() => regenerateMutation.mutate()}>
+                  <RefreshCw className="h-4 w-4" />
+                  Regenerate
+                </Button>
+              </div>
               {syllabusPlan.topics.map((topic) => {
                 const open = expandedTopics.has(topic.key);
                 return (
@@ -268,7 +330,14 @@ export default function StudentSyllabusGoalsPage() {
                       <div className="flex items-start gap-3">
                         <BookOpenCheck className="mt-1 h-5 w-5 shrink-0 text-[var(--accent-primary)]" />
                         <div>
-                          <h2 className="font-semibold text-[var(--text-primary)]">{topic.title}</h2>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-md bg-[var(--accent-primary)]/10 px-2 py-0.5 text-xs font-medium text-[var(--accent-primary)]">
+                              {levelLabel(topic.level)}
+                            </span>
+                            <h2 className="font-semibold text-[var(--text-primary)]">
+                              {topic.order ? `${topic.order}. ` : ""}{topic.title}
+                            </h2>
+                          </div>
                           {topic.description && <p className="mt-1 text-sm text-[var(--text-muted)]">{topic.description}</p>}
                         </div>
                       </div>
@@ -276,44 +345,71 @@ export default function StudentSyllabusGoalsPage() {
                     </button>
                     {open && (
                       <div className="space-y-3 border-t border-[var(--border-subtle)] p-4">
-                        {topic.subtopics.map((subtopic) => (
-                          <div key={subtopic.key} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4">
-                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                              <div>
-                                <p className="font-medium text-[var(--text-primary)]">{subtopic.title}</p>
-                                {subtopic.description && <p className="mt-1 text-sm text-[var(--text-muted)]">{subtopic.description}</p>}
-                              </div>
-                              <div className="w-full md:w-56">
-                                <div className="mb-1 flex justify-between text-xs text-[var(--text-muted)]">
-                                  <span>Progress</span>
-                                  <span>{subtopic.progressPercent}%</span>
+                        {topic.subtopics.map((subtopic) => {
+                          const subtopicOpen = expandedSubtopics.has(subtopic.key);
+                          const completedTasks = subtopic.tasks.filter((task) => task.completed).length;
+                          return (
+                            <div key={subtopic.key} className="overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
+                              <button type="button" className="flex w-full flex-col gap-3 p-4 text-left md:flex-row md:items-start md:justify-between" onClick={() => toggleSubtopic(subtopic.key)}>
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <p className="font-medium text-[var(--text-primary)]">
+                                      {subtopic.order ? `${subtopic.order}. ` : ""}{subtopic.title}
+                                    </p>
+                                    {subtopic.bonusAwarded ? (
+                                      <span className="inline-flex items-center gap-1 rounded-md bg-[var(--accent-success)]/10 px-2 py-0.5 text-xs text-[var(--accent-success)]">
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                        Bonus earned
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  {subtopic.description && <p className="mt-1 text-sm text-[var(--text-muted)]">{subtopic.description}</p>}
+                                  <div className="mt-2 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
+                                    {subtopic.estimatedHours ? (
+                                      <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-elevated)] px-2 py-1">
+                                        <Clock3 className="h-3.5 w-3.5" />
+                                        {subtopic.estimatedHours}h
+                                      </span>
+                                    ) : null}
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-[var(--bg-elevated)] px-2 py-1">
+                                      <ListChecks className="h-3.5 w-3.5" />
+                                      {completedTasks}/{subtopic.tasks.length} tasks
+                                    </span>
+                                  </div>
                                 </div>
-                                <input
-                                  type="range"
-                                  min="0"
-                                  max="100"
-                                  value={subtopic.progressPercent}
-                                  onChange={(event) =>
-                                    updateProgressMutation.mutate({
-                                      topicKey: topic.key,
-                                      subtopicKey: subtopic.key,
-                                      progressPercent: Number(event.target.value)
-                                    })
-                                  }
-                                  className="w-full accent-[var(--accent-primary)]"
-                                />
-                              </div>
+                                <div className="flex w-full items-center gap-3 md:w-56">
+                                  <div className="h-2 flex-1 rounded-full bg-[var(--bg-elevated)]">
+                                    <div className="h-full rounded-full bg-[var(--accent-primary)]" style={{ width: `${subtopic.progressPercent}%` }} />
+                                  </div>
+                                  <span className="w-10 text-right text-xs text-[var(--text-muted)]">{subtopic.progressPercent}%</span>
+                                  {subtopicOpen ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                                </div>
+                              </button>
+                              {subtopicOpen && (
+                                <ul className="grid gap-2 border-t border-[var(--border-subtle)] p-3 md:grid-cols-2 xl:grid-cols-3">
+                                  {subtopic.tasks.map((task, index) => (
+                                    <li key={task.key || `${subtopic.key}-${index}`}>
+                                      <button
+                                        type="button"
+                                        className="h-full w-full rounded-lg bg-[var(--bg-elevated)] p-3 text-left text-sm transition-[background-color] hover:bg-[var(--accent-primary)]/8"
+                                        onClick={() => openTask(topic.key, subtopic.key, task.key)}
+                                      >
+                                        <div className="mb-2 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-[0.08em] text-[var(--text-muted)]">
+                                          <span>{taskTypeLabel(task.type)}</span>
+                                          {task.estimatedMinutes ? <span>{task.estimatedMinutes} min</span> : null}
+                                          <span>{task.completed ? "Complete" : "10 pts"}</span>
+                                        </div>
+                                        <p className="font-medium text-[var(--text-primary)]">{task.title}</p>
+                                        {task.description && <p className="mt-1 text-xs text-[var(--text-muted)]">{task.description}</p>}
+                                        {task.resourceHint ? <p className="mt-2 text-xs text-[var(--accent-primary)]">{task.resourceHint}</p> : null}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
                             </div>
-                            <ul className="mt-4 grid gap-2 md:grid-cols-2">
-                              {subtopic.tasks.map((task, index) => (
-                                <li key={`${subtopic.key}-${index}`} className="rounded-lg bg-[var(--bg-elevated)] p-3 text-sm">
-                                  <p className="font-medium text-[var(--text-primary)]">{task.title}</p>
-                                  {task.description && <p className="mt-1 text-xs text-[var(--text-muted)]">{task.description}</p>}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </Card>

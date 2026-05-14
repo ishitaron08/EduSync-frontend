@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/api";
 import { describeApiError } from "@/lib/apiErrors";
@@ -9,10 +9,7 @@ import { useDashboardGuard } from "@/lib/authGuard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertTriangle, Award, Flame, KeyRound, Loader2, Mail, Target, UserRound } from "lucide-react";
-
-const PRESET_GOALS = ["Academic Improvement", "Placement Preparation", "Skill Development"];
+import { AlertTriangle, Award, Check, ChevronDown, Flame, KeyRound, Loader2, Mail, Target, UserRound } from "lucide-react";
 
 type StudentProfile = {
   name?: string;
@@ -28,6 +25,13 @@ type StudentProfile = {
   };
 };
 
+type GoalLibraryEntry = {
+  _id: string;
+  title: string;
+  isDefault: boolean;
+  usageCount: number;
+};
+
 export default function StudentProfilePage() {
   const allowed = useDashboardGuard("student");
   const queryClient = useQueryClient();
@@ -38,6 +42,7 @@ export default function StudentProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [goalDropdownOpen, setGoalDropdownOpen] = useState(false);
 
   const profileQuery = useQuery({
     queryKey: queryKeys.student.profile,
@@ -48,7 +53,30 @@ export default function StudentProfilePage() {
     enabled: allowed
   });
 
+  const goalLibraryQuery = useQuery({
+    queryKey: queryKeys.student.goalLibrary,
+    queryFn: async () => {
+      const { data } = await api.get<GoalLibraryEntry[]>("/student/goal-library");
+      return data;
+    },
+    enabled: allowed
+  });
+
   const profile = profileQuery.data ?? null;
+  const goalLibrary = goalLibraryQuery.data ?? [];
+  const currentName = name ?? profile?.name ?? "";
+  const currentGoal = goal ?? profile?.learningGoal ?? "";
+  const normalizedCurrentGoal = currentGoal.trim().toLowerCase();
+  const matchingGoal = goalLibrary.find((item) => item.title.toLowerCase() === normalizedCurrentGoal);
+  const savedGoal = profile?.learningGoal ?? "";
+  const isGoalChanged = currentGoal !== savedGoal;
+  const suggestedGoals = useMemo(() => {
+    const needle = currentGoal.trim().toLowerCase();
+    const matches = needle
+      ? goalLibrary.filter((item) => item.title.toLowerCase().includes(needle))
+      : goalLibrary;
+    return matches.slice(0, 8);
+  }, [currentGoal, goalLibrary]);
 
   if (!allowed || profileQuery.isLoading) {
     return (
@@ -57,10 +85,6 @@ export default function StudentProfilePage() {
       </main>
     );
   }
-
-  const currentName = name ?? profile?.name ?? "";
-  const currentGoal = goal ?? profile?.learningGoal ?? "";
-  const isGoalChanged = currentGoal !== (profile?.learningGoal ?? "");
 
   async function handleSave(event: FormEvent) {
     event.preventDefault();
@@ -74,13 +98,25 @@ export default function StudentProfilePage() {
 
     try {
       setSaving(true);
-      const payload: { name: string; learningGoal: string; password?: string } = { name: currentName, learningGoal: currentGoal };
+      const trimmedGoal = currentGoal.trim();
+      if (trimmedGoal.length < 3) {
+        setError("Learning goal must be at least 3 characters.");
+        return;
+      }
+      if (trimmedGoal.length > 80) {
+        setError("Learning goal must be 80 characters or fewer.");
+        return;
+      }
+
+      const payload: { name: string; learningGoal: string; password?: string } = { name: currentName, learningGoal: trimmedGoal };
       if (password) payload.password = password;
       await api.patch("/student/profile", payload);
       setSuccess("Profile updated successfully.");
       setPassword("");
       setConfirmPassword("");
       await queryClient.invalidateQueries({ queryKey: queryKeys.student.profile });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.student.goalLibrary });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.student.syllabusGoals });
     } catch (err) {
       setError(describeApiError(err));
     } finally {
@@ -123,18 +159,90 @@ export default function StudentProfilePage() {
                 <Target className="h-5 w-5 text-[var(--accent-amber)]" />
                 <h2 className="text-xl font-semibold text-[var(--text-primary)]">Learning goal</h2>
               </div>
-              {currentGoal && !PRESET_GOALS.includes(currentGoal) ? (
-                <Input value={currentGoal} onChange={(event) => setGoal(event.target.value)} placeholder="Custom learning goal" />
-              ) : (
-                <Select value={currentGoal} onValueChange={setGoal}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a goal" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRESET_GOALS.map((preset) => <SelectItem key={preset} value={preset}>{preset}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
+              <div className="space-y-3">
+                <div
+                  className="relative"
+                  onBlur={() => {
+                    window.setTimeout(() => setGoalDropdownOpen(false), 120);
+                  }}
+                >
+                  <div className="flex">
+                    <Input
+                      value={currentGoal}
+                      onFocus={() => setGoalDropdownOpen(true)}
+                      onChange={(event) => {
+                        setGoal(event.target.value);
+                        setGoalDropdownOpen(true);
+                      }}
+                      placeholder="Type or choose a goal"
+                      maxLength={80}
+                      className="rounded-r-none"
+                    />
+                    <button
+                      type="button"
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-r-lg border border-l-0 border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-muted)] transition-[background-color,color] hover:bg-[var(--bg-elevated)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--accent-primary)]/12"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => setGoalDropdownOpen((open) => !open)}
+                      aria-label="Show learning goal options"
+                      aria-expanded={goalDropdownOpen}
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {goalDropdownOpen ? (
+                    <div className="absolute z-30 mt-2 max-h-64 w-full overflow-auto rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-1 shadow-[var(--shadow-lift)]">
+                      {goalLibraryQuery.isLoading ? (
+                        <div className="space-y-1 p-2">
+                          <div className="nc-skeleton h-8 rounded-md" />
+                          <div className="nc-skeleton h-8 rounded-md" />
+                        </div>
+                      ) : suggestedGoals.length ? (
+                        suggestedGoals.map((item) => {
+                          const selected = item.title === currentGoal;
+                          return (
+                            <button
+                              key={item._id}
+                              type="button"
+                              className={[
+                                "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-[background-color,color]",
+                                selected
+                                  ? "bg-[var(--accent-primary)]/10 text-[var(--accent-primary)]"
+                                  : "text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+                              ].join(" ")}
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => {
+                                setGoal(item.title);
+                                setGoalDropdownOpen(false);
+                              }}
+                            >
+                              <span className="flex-1 font-medium">{item.title}</span>
+                              {selected ? <Check className="h-4 w-4" /> : null}
+                            </button>
+                          );
+                        })
+                      ) : currentGoal.trim().length >= 3 ? (
+                        <button
+                          type="button"
+                          className="flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm text-[var(--text-primary)] hover:bg-[var(--bg-elevated)]"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => setGoalDropdownOpen(false)}
+                        >
+                          <span>Create "{currentGoal.trim()}"</span>
+                          <span className="text-xs text-[var(--text-muted)]">on save</span>
+                        </button>
+                      ) : (
+                        <div className="px-3 py-2 text-sm text-[var(--text-muted)]">Type at least 3 characters to create a new goal.</div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+                {isGoalChanged && currentGoal.trim().length >= 3 ? (
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {matchingGoal ? "Saving will set this existing goal as active." : "Saving will create this goal and set it as active."}
+                  </p>
+                ) : null}
+              </div>
               {isGoalChanged ? (
                 <div className="mt-3 flex items-start gap-3 rounded-lg border border-[var(--accent-amber)]/30 bg-[var(--accent-amber)]/10 p-3 text-sm text-[var(--text-primary)]">
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent-amber)]" />

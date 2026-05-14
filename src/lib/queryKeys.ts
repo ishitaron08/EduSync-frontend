@@ -33,6 +33,7 @@ export const queryKeys = {
   student: {
     profile: ["student", "profile"] as const,
     goals: ["student", "goals"] as const,
+    goalLibrary: ["student", "goal-library"] as const,
     tasks: ["student", "tasks"] as const,
     freeSlots: ["student", "free-slots"] as const,
     timetable: ["student", "timetable"] as const,
