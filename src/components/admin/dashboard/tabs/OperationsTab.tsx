@@ -71,13 +71,13 @@ function ActionDetails({ log }: { log: AuditLogRow }) {
   const actorEmail = actor?.email || "";
   
   return (
-    <div className="space-y-2">
+    <div className="min-w-0 space-y-2">
       {/* Show who performed the action */}
-      <div className="flex items-center gap-2 text-sm">
+      <div className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
         <Shield className="h-4 w-4 text-[var(--accent-primary)]" />
         <span className="text-[var(--text-muted)]">By:</span>
-        <span className="font-medium text-[var(--text-primary)]">{actorName}</span>
-        {actorEmail && <span className="text-xs text-[var(--text-muted)]">({actorEmail})</span>}
+        <span className="min-w-0 break-words font-medium text-[var(--text-primary)]">{actorName}</span>
+        {actorEmail && <span className="min-w-0 break-all text-xs text-[var(--text-muted)]">({actorEmail})</span>}
       </div>
       
       {/* Show target user details for user actions */}
@@ -87,21 +87,21 @@ function ActionDetails({ log }: { log: AuditLogRow }) {
             <User className="h-4 w-4 text-[var(--accent-secondary)]" />
             Target User
           </div>
-          <div className="mt-2 space-y-1 text-sm">
+          <div className="mt-2 min-w-0 space-y-1 text-sm">
             {metadata.targetUserName && (
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
                 <span className="text-[var(--text-muted)]">Name:</span>
-                <span className="text-[var(--text-primary)]">{metadata.targetUserName}</span>
+                <span className="min-w-0 break-words text-[var(--text-primary)]">{metadata.targetUserName}</span>
               </div>
             )}
             {metadata.targetUserEmail && (
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
                 <span className="text-[var(--text-muted)]">Email:</span>
-                <span className="text-[var(--text-primary)]">{metadata.targetUserEmail}</span>
+                <span className="min-w-0 break-all text-[var(--text-primary)]">{metadata.targetUserEmail}</span>
               </div>
             )}
             {metadata.targetUserRole && (
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
                 <span className="text-[var(--text-muted)]">Role:</span>
                 <Badge tone={metadata.targetUserRole === "admin" ? "green" : metadata.targetUserRole === "teacher" ? "blue" : "amber"}>
                   {metadata.targetUserRole}
@@ -124,7 +124,7 @@ function ActionDetails({ log }: { log: AuditLogRow }) {
       {metadata.changes && metadata.changes.length > 0 && (
         <div className="text-sm">
           <span className="text-[var(--text-muted)]">Fields updated:</span>
-          <span className="ml-2 text-[var(--text-primary)]">{metadata.changes.join(", ")}</span>
+          <span className="ml-2 break-words text-[var(--text-primary)]">{metadata.changes.join(", ")}</span>
         </div>
       )}
       
@@ -132,13 +132,13 @@ function ActionDetails({ log }: { log: AuditLogRow }) {
       {(metadata.courseId || metadata.status) && !isUserAction && (
         <div className="text-sm space-y-1">
           {metadata.courseId && (
-            <div className="flex gap-2">
+            <div className="flex min-w-0 flex-wrap gap-2">
               <span className="text-[var(--text-muted)]">Course ID:</span>
-              <span className="text-[var(--text-primary)]">{metadata.courseId}</span>
+              <span className="min-w-0 break-all text-[var(--text-primary)]">{metadata.courseId}</span>
             </div>
           )}
           {metadata.status && (
-            <div className="flex gap-2">
+            <div className="flex min-w-0 flex-wrap gap-2">
               <span className="text-[var(--text-muted)]">Status:</span>
               <Badge tone="blue">{metadata.status}</Badge>
             </div>
@@ -149,12 +149,12 @@ function ActionDetails({ log }: { log: AuditLogRow }) {
       {/* Show student timetable info */}
       {metadata.studentName && (
         <div className="text-sm space-y-1">
-          <div className="flex gap-2">
+          <div className="flex min-w-0 flex-wrap gap-2">
             <span className="text-[var(--text-muted)]">Student:</span>
-            <span className="text-[var(--text-primary)]">{metadata.studentName}</span>
+            <span className="min-w-0 break-words text-[var(--text-primary)]">{metadata.studentName}</span>
           </div>
           {metadata.year && (
-            <div className="flex gap-2">
+            <div className="flex min-w-0 flex-wrap gap-2">
               <span className="text-[var(--text-muted)]">Year:</span>
               <span className="text-[var(--text-primary)]">{metadata.year}</span>
             </div>
@@ -180,9 +180,9 @@ function ActionDetails({ log }: { log: AuditLogRow }) {
               {Object.entries(metadata)
                 .filter(([key]) => !['targetUserId', 'targetUserName', 'targetUserEmail', 'targetUserRole', 'actorId', 'actorName', 'userId', 'student', 'studentId', 'studentName', 'year', 'changes', 'count', 'courseId', 'status', 'createdUserNames'].includes(key))
                 .map(([key, value]) => (
-                  <div key={key} className="flex gap-2">
+                  <div key={key} className="flex min-w-0 flex-wrap gap-2">
                     <span className="font-medium text-[var(--text-muted)]">{key}:</span>
-                    <span className="text-[var(--text-primary)]">
+                    <span className="min-w-0 break-all text-[var(--text-primary)]">
                       {typeof value === "object" ? JSON.stringify(value) : String(value)}
                     </span>
                   </div>
@@ -229,12 +229,12 @@ export function OperationsTab() {
                 const actionFormatted = formatAction(log.action);
                 return (
                   <div key={log._id} className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-4 hover:border-[var(--accent-primary)]/30 transition-colors">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex min-w-0 flex-wrap items-start justify-between gap-4">
                       {/* Left side: Time and Action */}
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-4">
+                        <div className="flex min-w-0 items-center gap-2 text-[var(--text-muted)]">
                           <Clock3 className="h-4 w-4" />
-                          <span className="whitespace-nowrap text-sm">{new Date(log.createdAt).toLocaleString()}</span>
+                          <span className="break-words text-sm sm:whitespace-nowrap">{new Date(log.createdAt).toLocaleString()}</span>
                         </div>
                         <Badge tone={actionFormatted.tone}>{actionFormatted.label}</Badge>
                         <Badge tone={log.actorRole === "admin" ? "green" : log.actorRole === "teacher" ? "blue" : "amber"}>
@@ -243,9 +243,9 @@ export function OperationsTab() {
                       </div>
                       
                       {/* Right side: Resource */}
-                      <div className="text-sm">
+                      <div className="min-w-0 text-sm">
                         <span className="text-[var(--text-muted)]">Resource:</span>
-                        <span className="ml-2 font-medium text-[var(--text-primary)]">{log.resource}</span>
+                        <span className="ml-2 break-words font-medium text-[var(--text-primary)]">{log.resource}</span>
                       </div>
                     </div>
                     

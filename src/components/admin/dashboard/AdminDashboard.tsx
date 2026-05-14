@@ -97,11 +97,11 @@ export function AdminDashboard() {
   }, [setUrlTab]);
 
   return (
-    <main className="mx-auto min-h-full max-w-[1600px] px-3 py-4 md:px-6 md:py-6 lg:px-8">
+    <main className="mx-auto min-h-full w-full max-w-full px-3 py-4 md:px-6 md:py-6 lg:max-w-[1600px] lg:px-8">
       <div className="space-y-6">
         <Card className="p-5 md:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="space-y-2">
+            <div className="min-w-0 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="amber">Admin only</Badge>
                 <Badge tone="green">Real data</Badge>

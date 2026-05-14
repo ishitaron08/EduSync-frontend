@@ -13,6 +13,7 @@ const titles: Record<string, string> = {
   "/dashboard/student/timetable": "Timetable",
   "/dashboard/student/attendance": "Attendance",
   "/dashboard/student/learning": "AI Learning",
+  "/dashboard/student/chat": "Study Chat",
   "/dashboard/student/syllabus-goals": "Syllabus Goals",
   "/dashboard/student/assessments": "Assessments",
   "/dashboard/student/leaderboard": "Leaderboard",

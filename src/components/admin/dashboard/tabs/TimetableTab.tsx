@@ -171,7 +171,7 @@ function TeacherPicker({
       </button>
 
       {open ? (
-        <div className="absolute z-40 mt-2 w-full min-w-[280px] rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 shadow-[var(--shadow-lift)]">
+        <div className="absolute z-40 mt-2 w-full min-w-0 max-w-[calc(100vw-2rem)] rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-2 shadow-[var(--shadow-lift)] sm:min-w-[280px]">
           <div className="relative mb-2">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
             <Input

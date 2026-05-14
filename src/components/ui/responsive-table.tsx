@@ -23,8 +23,8 @@ export function ResponsiveTable<T>({
   }
 
   return (
-    <div className={cn("min-w-0", className)}>
-      <div className="hidden overflow-x-auto rounded-xl border border-[var(--border-subtle)] md:block">
+    <div className={cn("min-w-0 max-w-full", className)}>
+      <div className="hidden max-w-full overflow-x-auto rounded-xl border border-[var(--border-subtle)] [-webkit-overflow-scrolling:touch] md:block">
         {table}
       </div>
       <div className="space-y-3 md:hidden">

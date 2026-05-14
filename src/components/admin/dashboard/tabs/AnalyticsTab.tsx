@@ -48,7 +48,7 @@ export function AnalyticsTab() {
             <Card className="flex flex-col items-center justify-center p-6 text-center">
               <p className="text-xs uppercase tracking-[0.08em] text-[var(--text-muted)]">Average Completion Rate</p>
               <div className="mt-4 flex items-center justify-center">
-                <span className="text-6xl font-bold text-[var(--accent-primary)]">
+                <span className="text-4xl font-bold text-[var(--accent-primary)] sm:text-6xl">
                   {data?.completionRate.toFixed(1)}%
                 </span>
               </div>
@@ -86,9 +86,9 @@ export function AnalyticsTab() {
               </div>
               <div className="mt-4 flex flex-wrap justify-center gap-4">
                 {data?.goalDistribution?.map((g, idx) => (
-                  <div key={g.name} className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
-                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
-                    <span className="capitalize">{g.name} ({g.value})</span>
+                  <div key={g.name} className="flex min-w-0 items-center gap-2 text-sm text-[var(--text-muted)]">
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: COLORS[idx % COLORS.length] }} />
+                    <span className="min-w-0 break-words capitalize">{g.name} ({g.value})</span>
                   </div>
                 ))}
               </div>

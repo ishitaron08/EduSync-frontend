@@ -301,7 +301,7 @@ function TabStrip({
   ];
 
   return (
-    <div className="flex border-b border-[var(--border-subtle)]">
+    <div className="flex max-w-full overflow-x-auto border-b border-[var(--border-subtle)] [-webkit-overflow-scrolling:touch]">
       {tabs.map((tab) => {
         const isActive = active === tab.id;
         const Icon = tab.icon;
@@ -311,7 +311,7 @@ function TabStrip({
             type="button"
             onClick={() => onChange(tab.id)}
             className={[
-              "inline-flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium transition-[color,border-color]",
+              "inline-flex shrink-0 items-center gap-2 border-b-2 px-3 py-3 text-sm font-medium transition-[color,border-color] sm:px-4",
               isActive
                 ? "border-[var(--accent-primary)] text-[var(--accent-primary)]"
                 : "border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]"

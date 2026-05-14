@@ -102,7 +102,7 @@ function WeekGrid({ slots }: { slots: ScheduleSlot[] }) {
   }
 
   return (
-    <div className="grid grid-cols-5 gap-3">
+    <div className="grid min-w-[760px] grid-cols-5 gap-3">
       {WEEK_DAYS.map((day) => (
         <div key={day} className="flex flex-col gap-2">
           {/* Day header */}

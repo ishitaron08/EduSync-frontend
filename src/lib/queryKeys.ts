@@ -45,6 +45,7 @@ export const queryKeys = {
     assessmentResults: ["student", "assessments", "results"] as const,
     assessmentTake: (assessmentId: string) => ["student", "assessments", assessmentId, "take"] as const,
     rewardPoints: ["student", "reward-points"] as const,
-    syllabusGoals: ["student", "syllabus-goals"] as const
+    syllabusGoals: ["student", "syllabus-goals"] as const,
+    chatStatus: ["student", "chat", "status"] as const
   }
 };

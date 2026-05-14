@@ -12,7 +12,24 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TeacherPageShell } from "@/components/teacher/TeacherPageShell";
 
-type PerfStudent = { _id: string; name: string; email: string; rewardPoints?: number };
+type PerfStudent = {
+  _id: string;
+  name: string;
+  email: string;
+  rewardPoints?: number;
+  section?: {
+    sectionCode?: string;
+    course?: {
+      code?: string;
+      name?: string;
+    };
+  } | null;
+};
+
+function sectionLabel(section: PerfStudent["section"]) {
+  if (!section) return "Allocated section";
+  return [section.course?.code || section.course?.name, section.sectionCode].filter(Boolean).join(" ") || "Allocated section";
+}
 
 export default function TeacherDashboardPage() {
   const allowed = useDashboardGuard("teacher");
@@ -130,6 +147,7 @@ export default function TeacherDashboardPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium text-[var(--text-primary)]">{student.name}</p>
                     <p className="truncate text-xs text-[var(--text-muted)]">{student.email}</p>
+                    <p className="mt-0.5 truncate text-xs text-[var(--accent-primary)]">{sectionLabel(student.section)}</p>
                     <div className="mt-2 flex h-4 items-end gap-1">
                       {spark.map((value, index) => (
                         <div key={index} className="w-1 rounded-sm bg-[var(--accent-secondary)]/70" style={{ height: `${value / 3}px` }} />
@@ -139,7 +157,7 @@ export default function TeacherDashboardPage() {
                 </div>
               );
             })}
-            {perf.length === 0 && <p className="text-sm text-[var(--text-muted)]">No performance data yet.</p>}
+            {perf.length === 0 && <p className="text-sm text-[var(--text-muted)]">No students are linked to your allocated sections yet.</p>}
           </div>
         </Card>
 
